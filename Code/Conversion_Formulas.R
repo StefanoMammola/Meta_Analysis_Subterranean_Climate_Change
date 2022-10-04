@@ -3,7 +3,9 @@
 ## A global meta-analysis on the biological impacts of climate change in subterranean ecosystems
 # Ilaria Vaccarelli, Raquel Colado, David Sanchez-Fernandez, Diana M. P. Galassi, Susana Pallarés, Mattia Di Cicco, Melissa B. Meierhofer, Elena Piano, Stefano Mammola
 
+## ------------------------------------------------------------------------
 # 'Conversion formulas used in the meta-analysis'
+## ------------------------------------------------------------------------
 
 # Analysis performed with R (v. R 4.1.0) and R studio (v. 1.4.1103)
 # Authors (code): Stefano Mammola

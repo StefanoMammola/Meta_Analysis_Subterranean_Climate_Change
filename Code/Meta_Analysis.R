@@ -3,7 +3,9 @@
 ## A global meta-analysis on the biological impacts of climate change in subterranean ecosystems
 # Ilaria Vaccarelli, Raquel Colado, David Sanchez-Fernandez, Diana M. P. Galassi, Susana Pallarés, Mattia Di Cicco, Melissa B. Meierhofer, Elena Piano, Stefano Mammola
 
+## ------------------------------------------------------------------------
 # 'R script to reproduce the analyses'
+## ------------------------------------------------------------------------
 
 # Analysis performed with R (v. R 4.1.0) and R studio (v. 1.4.1103)
 # Authors (code): Stefano Mammola
@@ -20,6 +22,10 @@ library("dplyr")
 library("metafor")   # Meta-Analysis Package for R
 library("ggplot2") 
 library("tidyverse")
+
+# Sourcing useful functions ------------------------------------------------
+
+source("Functions/Custom_functions.r")
 
 ###############################################################
 
@@ -47,7 +53,7 @@ db_unique <- dplyr::distinct(db_full, Paper_ID, .keep_all = TRUE)
 nrow(db)
 nrow(db_unique)
 
-mean(table(db$ID)) ; SE(table(db$ID)) # mean number of estimates/paper
+mean(table(db$Paper_ID)) ; SE(table(db$Paper_ID)) # mean number of estimates/paper
 
 # Data exploration --------------------------------------------------------
 
