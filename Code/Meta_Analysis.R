@@ -57,21 +57,14 @@ mean(table(db$Paper_ID)) ; SE(table(db$Paper_ID)) # mean number of estimates/pap
 
 # Data exploration --------------------------------------------------------
 
+#Checking balancing of factors
 table(db$Domain)
 table(db$System_specific)
 table(db$Phylum)
 
+
 table(db$Predictor_Group)
-
-
-#Type of actions
-table(db$Publication_type)
-
-#Summary statistics (Literature)
-table(db_unique$Source) ; sum(table(db_unique$Source)) # N° of unique sources
-
-#Summary statistics (Testing)
-table(db$Tested_statistically)[2] / sum(table(db$Tested_statistically)) #N° and % testing
+table(db$Year)
 
 #How many estimates would be usable for meta analysis?
 n_studies            <- c() 
