@@ -22,8 +22,13 @@ library("dplyr")
 library("metafor")   
 library("ggplot2")
 library("ggthemes")
+library("png")
 library("tidyverse")
 library("tidylog")
+
+# Loading pictures ------------------------------------------------------
+
+Badino_2004 <- png::readPNG("Pictures/Badino_2004.png")
 
 # Sourcing useful functions ------------------------------------------------
 
@@ -45,6 +50,8 @@ db.pub <-
     as.is = FALSE
   )
 
+str(db.pub)
+
 # Database for meta analaysis
 db.meta <-
   read.csv(
@@ -55,8 +62,11 @@ db.meta <-
     as.is = FALSE
   )
 
+str(db.meta)
+
 # Database with only one estimate / paper
-db.meta.distinct <- db.meta %>% dplyr::distinct(Paper_ID, .keep_all = TRUE) 
+db.meta.distinct <- db.meta %>% 
+                    dplyr::distinct(Paper_ID, .keep_all = TRUE) 
 
 # Extracting temporal range of each study ---------------------------------
 # Extracting year for each study ------------------------------------------
@@ -70,10 +80,11 @@ Yr_min   <- c()
 Yr_max   <- c()
 Yr_range <- c()
 
-for (i in 1:nrow(db.meta)){
+for (i in 1 : nrow(db.meta)){
   
   Data_i   <- db.meta[i,]
-  Year     <- as.character(Data_i$Year) ; Year <- gsub(";", "-", Year) #replace comma if needed
+  Year     <- as.character(Data_i$Year)
+  Year     <- gsub(";", "-", Year) #replace comma if needed
   Year     <- as.numeric(strsplit(Year, "-")[[1]]) #split the year range
   
   if(is.na(Year) == TRUE) { 
@@ -82,13 +93,13 @@ for (i in 1:nrow(db.meta)){
     Yr_range <- c(Yr_range, NA) } else {
     Yr_min   <- c(Yr_min, range(Year)[1])
     Yr_max   <- c(Yr_max, range(Year)[2])
-    Yr_range <- c(Yr_range, (range(Year)[2]-range(Year)[1])) }
+    Yr_range <- c(Yr_range, (range(Year)[2] - range(Year)[1])) }
   
 } #Warnings() occur when the range is just a single number (i.e. no range)
 
 # check the values
-range(Yr_max, na.rm = TRUE)
-range(Yr_min, na.rm = TRUE)
+range(Yr_max,   na.rm = TRUE)
+range(Yr_min,   na.rm = TRUE)
 range(Yr_range, na.rm = TRUE)
 
 db.meta <- data.frame(db.meta, Yr_min, Yr_max, Yr_range) ; head(db.meta)
@@ -99,7 +110,7 @@ db.meta <- data.frame(db.meta, Yr_min, Yr_max, Yr_range) ; head(db.meta)
 db.pub %>% dplyr::distinct(Paper_ID, .keep_all = TRUE) %>% nrow()
 
 # How many papers for meta-analysis?
-nrow(db.meta.distinct)
+db.meta.distinct %>% nrow()
 
 # How many email requests?
 db.pub[db.pub$Corresponding_emailed == "yes",] %>% dplyr::select(Answer) %>% table()
@@ -107,11 +118,10 @@ db.pub[db.pub$Corresponding_emailed == "yes",] %>% dplyr::select(Answer) %>% tab
 # What is the mean number of estimates/paper? 
 mean(table(db.meta$Paper_ID)) ; SE(table(db.meta$Paper_ID))
 
-# How many papers for different systems?
+# How many papers for different systems / taxa?
 db.meta.distinct %>% dplyr::select(Domain) %>% table()
 db.meta.distinct %>% dplyr::select(System_specific) %>% table()
-
-
+db.meta %>% dplyr::select(Ecology_group) %>% table()
 
 ###############################################################
 ## Figures:
@@ -143,7 +153,7 @@ world <- ggplot2::map_data("world")
                  size = n), 
              alpha = 0.9, 
              shape = 21, color = "black") +
-  scale_fill_manual(values = c("turquoise","white"))+
+  scale_fill_manual(values = c("turquoise","orange"))+
     guides(fill=guide_legend(title=NULL),
            size=guide_legend(title=NULL))+
     scale_y_continuous(breaks = (-2:2) * 30) +
@@ -165,85 +175,16 @@ world <- ggplot2::map_data("world")
     scale_x_continuous(breaks = seq(from=min(db.pub$Year_publication),
                                       to=max(db.pub$Year_publication),by=4))+ 
     scale_y_continuous(breaks = seq(from=0,to=10,by=1))+
+   
+   # annotation_custom(grid::rasterGrob(Badino_2004),
+   #                   xmin = unit(1990, "native"), xmax = unit(2010,"native"),
+   #                   ymin = unit(3,"npc"),  ymax = unit(5,"npc"))+
+   # 
     labs(x = NULL,
          y = "Number of studies")+
     theme_classic())
 
 # Data exploration --------------------------------------------------------
-
-#Checking balancing of factors
-table(db.meta$Domain)
-table(db.meta$System_specific)
-
-table(db$Predictor_Group)
-table(db$Year)
-
-#How many estimates would be usable for meta analysis?
-n_studies            <- c() 
-n_estimates_testing  <- c()
-n_estimates_tot      <- c()
-perc_testing         <- c()
-usable               <- c()
-unusable             <- c()
-perc_usable          <- c()
-
-for(i in 1:nlevels(db$Conservation_Action)){
-
-  db_i_tot <- db[db$Conservation_Action == levels(db$Conservation_Action)[i],]
-  db_i     <- db_i_tot[db_i_tot$Tested_statistically == "yes",]
-  
-  table_i        <- table(db_i$Pearson_r_conversion) #% of usable statistics
-  n_studies      <- c(n_studies, nrow(distinct(db_i, ID, .keep_all = TRUE)) ) #unique studies
-  n_estimates_testing    <- c(n_estimates_testing, nrow(db_i) ) #unique estimates
-  n_estimates_tot    <- c(n_estimates_tot, nrow(db_i_tot) ) #unique estimates
-  perc_testing   <- c(perc_testing, round(nrow(db_i)/nrow(db_i_tot),2)*100 )
-  usable         <- c(usable, sum(table_i[1],table_i[3]))
-  unusable       <- c(unusable, sum(table_i[2]))
-  perc_usable    <- c(perc_usable, round((usable[i]/sum(table_i)),2)*100)
-  
-}
-
-Table_1 <- data.frame(Intervention = levels(db$Conservation_Action), n_studies, n_estimates_testing, n_estimates_tot, perc_testing, usable, unusable, perc_usable)
-Table_1[is.na(Table_1)] <- 0
-colnames(Table_1) <- c("Intervention", "N° studies", "N° interventions testing","N° interventions tot", "% testing", "N° usable", "N° unusable", "% usable")
-
-write.csv(Table_1,"Tables/Table_1.csv")
-
-#How many estimates would be usable for meta analysis?
-n_studies            <- c() 
-n_estimates_testing  <- c()
-n_estimates_tot      <- c()
-perc_testing         <- c()
-usable               <- c()
-unusable             <- c()
-perc_usable          <- c()
-
-for(i in 1:nlevels(db$Impact)){
-  
-  db_i_tot <- db[db$Impact == levels(db$Impact)[i],]
-  db_i     <- db_i_tot[db_i_tot$Tested_statistically == "yes",]
-  
-  table_i        <- table(db_i$Pearson_r_conversion) #% of usable statistics
-  n_studies      <- c(n_studies, nrow(distinct(db_i, ID, .keep_all = TRUE)) ) #unique studies
-  n_estimates_testing    <- c(n_estimates_testing, nrow(db_i) ) #unique estimates
-  n_estimates_tot    <- c(n_estimates_tot, nrow(db_i_tot) ) #unique estimates
-  perc_testing   <- c(perc_testing, round(nrow(db_i)/nrow(db_i_tot),2)*100 )
-  usable         <- c(usable, sum(table_i[1],table_i[3]))
-  unusable       <- c(unusable, sum(table_i[2]))
-  perc_usable    <- c(perc_usable, round((usable[i]/sum(table_i)),2)*100)
-  
-}
-
-Table_2 <- data.frame(Impact = levels(db$Impact), n_studies, n_estimates_testing, n_estimates_tot, perc_testing, usable, unusable, perc_usable)
-Table_2[is.na(Table_2)] <- 0
-colnames(Table_2) <- c("Impact", "N° studies", "N° interventions testing","N° interventions tot", "% testing", "N° usable", "N° unusable", "% usable")
-
-write.csv(Table_2,"Tables/Table_2.csv")
-
-#Redefining levels
-levels(db$Impact)[2] <- "Multiple"
-
-levels(db$Conservation_Action)[5] <- "Gating"
 
 ###############################################################
 
@@ -251,76 +192,169 @@ levels(db$Conservation_Action)[5] <- "Gating"
 
 ###############################################################
 
-db_metafor <- db[db$Tested_statistically == "yes",]
-db_metafor <- db_metafor[db_metafor$Pearson_r_conversion == "converted",]
-db_metafor <- droplevels(db_metafor)
-
-mean(table(db_metafor$ID)) ; sd(table(db_metafor$ID))
-
-dim(db_metafor)
-nlevels(db_metafor$ID) #250 references 
-
-db_metafor <- db_metafor %>% select(ID, 
-                             N,
-                             Domain,
-                             System,
-                             Family,
-                             Genus_specific,
-                             Response_Group,
-                             Predictor_Group,
-                             r = Pearson.s_r)
+db.metafor <- db.meta %>% dplyr::select(Paper_ID, 
+                                        Domain,
+                                        Yr = Yr_range,
+                                        Phylum,
+                                        Ecology  = Ecology_group,
+                                        Response = Response_Group2,
+                                        N,
+                                        r = Pearson_r_conversion)
 
 # Derive Fischer's Z and its variance
-
-db_metafor <- metafor::escalc(measure = "COR", ri = r, ni = N, data = db_metafor)
-
-# Gate
-db_metafor <- db_metafor[db_metafor$Predictor_Group == "Gate" | 
-                         db_metafor$Predictor_Group == "Disturbance reduction" |
-                         db_metafor$Predictor_Group == "Restoration" |
-                         db_metafor$Predictor_Group == "Decontamination" |
-                         db_metafor$Predictor_Group == "Monitoring", ] ; db_metafor <- droplevels(db_metafor)
-
-table(db_metafor$Predictor_Group,db_metafor$Response_Group) # Disturbance reduction & Gate
-
-# Removing combinations with 1 study only
-db_metafor <- db_metafor[!c(db_metafor$Predictor_Group == "Disturbance reduction" & db_metafor$Response_Group == "Population"),]
-db_metafor <- db_metafor[!c(db_metafor$Predictor_Group == "Monitoring" & db_metafor$Response_Group == "Pathogen"),]
-db_metafor <- db_metafor[!c(db_metafor$Predictor_Group == "Restoration" & db_metafor$Response_Group == "Behavior"),]
+db.metafor <- metafor::escalc(measure = "COR", ri = r, ni = N, data = db.metafor)
 
 #Check sample size for each predictors
-table_n <- data.frame(predictor = NULL, n = NULL, n_papers = NULL)
+table_estimates <- data.frame(predictor = NULL, n = NULL, n_papers = NULL)
 
-for(i in 1:length(unique(levels(db_metafor$Response_Group))))
-  table_n <- rbind(table_n, 
-                          data.frame(predictor = levels(db_metafor$Response_Group)[i],
-                                     n = nrow(db_metafor[db_metafor$Response_Group == levels(db_metafor$Response_Group)[i], ]),
-                                     n_papers = length(unique(db_metafor[db_metafor$Response_Group == levels(db_metafor$Response_Group)[i], ]$ID)))  
-                          
-  )
+for(i in 1:length(unique(levels(db.metafor$Response))))
+  table_estimates <- rbind(table_estimates,
+                          data.frame(
+                            predictor = levels(db.metafor$Response)[i],
+                            n = nrow(db.metafor[db.metafor$Response == levels(db.metafor$Response)[i],]),
+                            n_papers = length(
+                              unique(db.metafor[db.metafor$Response == levels(db.metafor$Response)[i],]$Paper_ID)
+                          )
+  ))
 
-actions_to_analyse    <- c("Decontamination", "Disturbance reduction", "Gate", "Monitoring", "Restoration")
+# Removing predictors with a single study
+db.metafor <- db.metafor[!(db.metafor$Response %in% table_estimates[table_estimates$n_papers < 2,]$predictor),]
+db.metafor <- droplevels(db.metafor)
 
-SUBSET      <- list()
-MODEL       <- list()
+# Fitting the metafor models ----------------------------------------------
 
-result_for_plot <- data.frame(label_action = NULL,
-                              label_pred = NULL,
-                              size = NULL,
-                              b     = NULL,
-                              beta  = NULL,
-                              se    = NULL,
-                              z = NULL,
-                              p     = NULL,
-                              ci.lb = NULL,
-                              ci.ub = NULL,
-                              ES    = NULL,
-                              L     = NULL,
-                              U     = NULL,
-                              failsafe_N = NULL,
-                              failsafe_p = NULL)
+#Fitting the models
+MODEL     <- list()
+MODEL2    <- list()
 
-num <- 0
+for (i in 1 : nlevels(db.metafor$Response)){  
+  
+  #subset the predictor
+  data_i  <- db.metafor[db.metafor$Response == levels(db.metafor$Response)[i], ]
+  
+  #fitting the model
+  model_i <- metafor::rma.mv(yi, vi, random =  ~ 1 | Paper_ID, data = na.omit(data_i),
+                             control=list(rel.tol=1e-8)) 
+  
+  model2_i <- rma.mv(yi, vi, mods = ~ Ecology, 
+                    random = ~ 1 | Paper_ID, 
+                    data = na.omit(data_i),
+                    control=list(rel.tol=1e-8))
+  
+  
+  #extracting coefficients
+  result_for_plot_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
+                                                " (" ,
+                                                nrow(data_i),", ",
+                                                length(unique(data_i$Paper_ID)),")",sep=''),
+                                  b     = model_i$b,
+                                  ci.lb = model_i$ci.lb,
+                                  ci.ub = model_i$ci.ub,
+                                  ES    = ((exp(model_i$b)-1))/((exp(model_i$b)+1)),
+                                  L     = ((exp(model_i$ci.lb)-1)/(exp(model_i$ci.lb)+1)),
+                                  U     = ((exp(model_i$ci.ub)-1)/(exp(model_i$ci.ub)+1)))
+  
+  table_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
+                         N       = nrow(data_i),
+                         Beta_SE = paste(round(model_i$beta,2),"+/-", round(model_i$se,2),sep=''),
+                         CI = paste(round(model_i$ci.lb,2), " | ", round(model_i$ci.ub,2),sep=''),
+                         p = round(model_i$pval,2))
+  
+  #metafor
+  result_for_plot2_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
+                                                " (" ,
+                                                nrow(data_i),", ",
+                                                length(unique(data_i$Paper_ID)),")",sep=''),
+                                  b     = model2_i$b,
+                                  ci.lb = model2_i$ci.lb,
+                                  ci.ub = model2_i$ci.ub,
+                                  ES    = ((exp(model2_i$b)-1))/((exp(model2_i$b)+1)),
+                                  L     = ((exp(model2_i$ci.lb)-1)/(exp(model2_i$ci.lb)+1)),
+                                  U     = ((exp(model2_i$ci.ub)-1)/(exp(model2_i$ci.ub)+1)))
+  
+  table2_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
+                         N       = nrow(data_i),
+                         Beta_SE = paste(round(model2_i$beta,2),"+/-", round(model2_i$se,2),sep=''),
+                         CI = paste(round(model2_i$ci.lb,2), " | ", round(model2_i$ci.ub,2),sep=''),
+                         p = round(model_i$pval,2))
+  
+  
+  # Store the data 
+  MODEL[[i]]      <- model_i
+  MODEL2[[i]]      <- model2_i
+  
+  # Store tables
+  if(i > 1) {    
+    result_for_plot <- rbind(result_for_plot,result_for_plot_i)
+    table_sup_mat   <- rbind(table_sup_mat,table_i)
+    result_for_plot2 <- rbind(result_for_plot2,result_for_plot2_i)
+    table_sup_mat2   <- rbind(table_sup_mat2,table2_i)
+    } else {
+  result_for_plot <- result_for_plot_i
+  table_sup_mat   <- table_i
+  
+  result_for_plot2 <- result_for_plot2_i
+  table_sup_mat2   <- table2_i
+    }
+}
+
+
+# renaming Response group as in the result_for_plot
+levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
+db.metafor$Yr <- log(db.metafor$Yr +1)
+str(db.metafor)
+
+(forest_plot <- 
+    result_for_plot %>%
+    ggplot2::ggplot(aes(x = ES, y = label)) + 
+    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
+    geom_jitter(data = db.metafor, aes(y = Response, x = r, col = Phylum, shape = Domain), 
+                alpha = 0.5, size = 1, width = 0.02)+
+    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0)+
+    geom_point(size = 3, pch = 21, col = "black", fill = "grey10") +
+    
+    # geom_text(aes(col = Type),label = paste0(round(table.plot.M1.2$Beta, 3), sign.M1.2, sep = "  "), 
+    #           vjust = - 1, size = 3) +
+    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
+         y = NULL) +
+    
+    theme_classic() + theme(#legend.position = "none",
+                            
+                            strip.text.x = element_text(size = 12),
+                            #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
+                            axis.text.x = element_text(size = 11),
+                            axis.title = element_text(size = 13))
+  
+)
+
+# Renaming disciplines
+result_for_plot2 <- data.frame(result_for_plot2, 
+                                         Ecology = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
+
+result_for_plot2$Ecology <- as.factor(result_for_plot2$Ecology)
+
+levels(result_for_plot2$Ecology) <- c("Multiple", "Subterranean", "Surface")
+
+(forest_plot2 <- 
+    result_for_plot2 %>%
+    ggplot2::ggplot(aes(x = ES, y = label, col = Ecology, fill = Ecology)) + 
+    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
+    
+    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0, position = position_dodge(width = 0.6))+
+    geom_point(size = 3, pch = 21,position = position_dodge(width = 0.6)) +
+    
+    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
+         y = NULL) +
+    
+    theme_classic() + theme(#legend.position = "none",
+      
+      strip.text.x = element_text(size = 12),
+      #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
+      axis.text.x = element_text(size = 11),
+      axis.title = element_text(size = 13))
+  
+)
+
 
 # Modelling
 for (j in 1:length(actions_to_analyse)){ 
