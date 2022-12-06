@@ -19,49 +19,161 @@ rm(list = ls())
 # Loading R package -------------------------------------------------------
 
 library("dplyr")
-library("metafor")   # Meta-Analysis Package for R
-library("ggplot2") 
+library("metafor")   
+library("ggplot2")
+library("ggthemes")
 library("tidyverse")
+library("tidylog")
 
 # Sourcing useful functions ------------------------------------------------
 
 source("Functions/Custom_functions.r")
 
 ###############################################################
-
 ## Data preparation:
-
 ###############################################################
 
-# Loading the Database ----------------------------------------------------
+# Loading the Databases ---------------------------------------------------
 
-db <-
+# Literature database
+db.pub <-
   read.csv(
-    file = "Data/data.csv",
+    file = "Data/publications.csv",
     sep = '\t',
     dec = ',',
     header = TRUE,
     as.is = FALSE
   )
 
-# Checking the database
-str(db)
+# Database for meta analaysis
+db.meta <-
+  read.csv(
+    file = "Data/meta_analysis.csv",
+    sep = '\t',
+    dec = ',',
+    header = TRUE,
+    as.is = FALSE
+  )
 
-#Database only with distinct paper
-db_unique <- dplyr::distinct(db_full, Paper_ID, .keep_all = TRUE) 
+# Database with only one estimate / paper
+db.meta.distinct <- db.meta %>% dplyr::distinct(Paper_ID, .keep_all = TRUE) 
 
-nrow(db)
-nrow(db_unique)
+# Extracting temporal range of each study ---------------------------------
+# Extracting year for each study ------------------------------------------
 
-mean(table(db$Paper_ID)) ; SE(table(db$Paper_ID)) # mean number of estimates/paper
+#Calculating year range for the dataset analysed by each scientometric article
+
+levels(db.meta$Year)
+
+#Extracting range with a loop
+Yr_min   <- c()
+Yr_max   <- c()
+Yr_range <- c()
+
+for (i in 1:nrow(db.meta)){
+  
+  Data_i   <- db.meta[i,]
+  Year     <- as.character(Data_i$Year) ; Year <- gsub(";", "-", Year) #replace comma if needed
+  Year     <- as.numeric(strsplit(Year, "-")[[1]]) #split the year range
+  
+  if(is.na(Year) == TRUE) { 
+    Yr_min   <- c(Yr_min, NA)
+    Yr_max   <- c(Yr_max, NA)
+    Yr_range <- c(Yr_range, NA) } else {
+    Yr_min   <- c(Yr_min, range(Year)[1])
+    Yr_max   <- c(Yr_max, range(Year)[2])
+    Yr_range <- c(Yr_range, (range(Year)[2]-range(Year)[1])) }
+  
+} #Warnings() occur when the range is just a single number (i.e. no range)
+
+# check the values
+range(Yr_max, na.rm = TRUE)
+range(Yr_min, na.rm = TRUE)
+range(Yr_range, na.rm = TRUE)
+
+db.meta <- data.frame(db.meta, Yr_min, Yr_max, Yr_range) ; head(db.meta)
+
+# Summary stats -----------------------------------------------------------
+
+# How many papers?
+db.pub %>% dplyr::distinct(Paper_ID, .keep_all = TRUE) %>% nrow()
+
+# How many papers for meta-analysis?
+nrow(db.meta.distinct)
+
+# How many email requests?
+db.pub[db.pub$Corresponding_emailed == "yes",] %>% dplyr::select(Answer) %>% table()
+
+# What is the mean number of estimates/paper? 
+mean(table(db.meta$Paper_ID)) ; SE(table(db.meta$Paper_ID))
+
+# How many papers for different systems?
+db.meta.distinct %>% dplyr::select(Domain) %>% table()
+db.meta.distinct %>% dplyr::select(System_specific) %>% table()
+
+
+
+###############################################################
+## Figures:
+###############################################################
+
+# Map ---------------------------------------------------------------------
+
+#adding stas to be plotted
+db.pub <- db.pub %>%
+  dplyr::left_join(db.meta.distinct %>%
+                     dplyr::select(Paper_ID, Domain),
+                   by = "Paper_ID") %>%
+  dplyr::left_join(db.meta %>%
+                     group_by(Paper_ID) %>%
+                     summarise(n = n()),
+                   by = "Paper_ID")
+
+# Load world map
+world <- ggplot2::map_data("world")
+
+(plot.map <- ggplot() +
+  geom_map(data = world, map = world,
+           aes(long, lat, map_id = region),
+           color = "black", fill = "grey10", size = 0.1) +
+  geom_point(data = db.pub %>% na.omit(Domain),
+             aes(jitter(Longitude,4), 
+                 jitter(Latitude,4), 
+                 fill = Domain,
+                 size = n), 
+             alpha = 0.9, 
+             shape = 21, color = "black") +
+  scale_fill_manual(values = c("turquoise","white"))+
+    guides(fill=guide_legend(title=NULL),
+           size=guide_legend(title=NULL))+
+    scale_y_continuous(breaks = (-2:2) * 30) +
+    scale_x_continuous(breaks = (-4:4) * 45) +
+  ggthemes::theme_map()+
+    theme(legend.position = c(0.05,0.1)))
+
+# Temporal trend ----------------------------------------------------------
+
+(plot.year <- ggplot(db.pub %>% 
+                       dplyr::distinct(Paper_ID, .keep_all = TRUE) %>% 
+                       group_by(Yr = Year_publication) %>% 
+                       summarise(n = n()) %>% 
+                       mutate(csum = cumsum(n)),
+                     aes(x=Yr, y=n)) + 
+    geom_line(linetype = 1, alpha = 1, col = "black")+
+    geom_point(size =2, shape = 21, alpha = 1, col = "black", fill = "grey20")+
+    #geom_line(aes(x=Yr, y=csum),linetype = 1, alpha = 1, col = "orange")+
+    scale_x_continuous(breaks = seq(from=min(db.pub$Year_publication),
+                                      to=max(db.pub$Year_publication),by=4))+ 
+    scale_y_continuous(breaks = seq(from=0,to=10,by=1))+
+    labs(x = NULL,
+         y = "Number of studies")+
+    theme_classic())
 
 # Data exploration --------------------------------------------------------
 
 #Checking balancing of factors
-table(db$Domain)
-table(db$System_specific)
-table(db$Phylum)
-
+table(db.meta$Domain)
+table(db.meta$System_specific)
 
 table(db$Predictor_Group)
 table(db$Year)
@@ -699,5 +811,6 @@ animal_jaccard <- ifelse(animal_jaccard>0.8, 1, 0)     # Binarize
 animal_jaccard <- graph_from_adjacency_matrix(animal_jaccard,    # Create an igraph network
                                           mode = "undirected")
 plot(animal_jaccard)
+
 
 
