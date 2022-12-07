@@ -145,21 +145,23 @@ world <- ggplot2::map_data("world")
 (plot.map <- ggplot() +
   geom_map(data = world, map = world,
            aes(long, lat, map_id = region),
-           color = "black", fill = "grey10", size = 0.1) +
-  geom_point(data = db.pub %>% na.omit(Domain),
+           color = "grey20", fill = "grey40", size = 0.1) +
+  ylim(-50,90)+
+  geom_point(data = db.pub,
              aes(jitter(Longitude,4), 
                  jitter(Latitude,4), 
-                 fill = Domain,
-                 size = n), 
-             alpha = 0.9, 
+                 fill = Study_type), 
+             size = 4,
+             alpha = 0.7, 
              shape = 21, color = "black") +
-  scale_fill_manual(values = c("turquoise","orange"))+
+  scale_fill_manual("Type of study",values = c("turquoise","orange","white","blue"))+
     guides(fill=guide_legend(title=NULL),
            size=guide_legend(title=NULL))+
-    scale_y_continuous(breaks = (-2:2) * 30) +
+    #scale_y_continuous(breaks = (-2:2) * 30) +
     scale_x_continuous(breaks = (-4:4) * 45) +
   ggthemes::theme_map()+
-    theme(legend.position = c(0.05,0.1)))
+    theme(legend.position = c(0.05,0.2),
+          legend.background=element_rect(fill = alpha("white", 0))))
 
 # Temporal trend ----------------------------------------------------------
 
@@ -171,7 +173,8 @@ world <- ggplot2::map_data("world")
                      aes(x=Yr, y=n)) + 
     geom_line(linetype = 1, alpha = 1, col = "black")+
     geom_point(size =2, shape = 21, alpha = 1, col = "black", fill = "grey20")+
-    #geom_line(aes(x=Yr, y=csum),linetype = 1, alpha = 1, col = "orange")+
+    # geom_smooth(method = "glm", se = FALSE,color= "orange", linetype = 2,
+    #             method.args = list(family = "poisson"))+
     scale_x_continuous(breaks = seq(from=min(db.pub$Year_publication),
                                       to=max(db.pub$Year_publication),by=4))+ 
     scale_y_continuous(breaks = seq(from=0,to=10,by=1))+
@@ -197,7 +200,8 @@ db.metafor <- db.meta %>% dplyr::select(Paper_ID,
                                         Yr = Yr_range,
                                         Phylum,
                                         Ecology  = Ecology_group,
-                                        Response = Response_Group2,
+                                        Response = Response_Group,
+                                        Type = Response_macrogroup,
                                         N,
                                         r = Pearson_r_conversion)
 
@@ -219,7 +223,7 @@ for(i in 1:length(unique(levels(db.metafor$Response))))
 
 # Removing predictors with a single study
 db.metafor <- db.metafor[!(db.metafor$Response %in% table_estimates[table_estimates$n_papers < 2,]$predictor),]
-db.metafor <- droplevels(db.metafor)
+db.metafor <- droplevels(db.metafor) #dropped a study on Morphology
 
 # Fitting the metafor models ----------------------------------------------
 
@@ -229,48 +233,67 @@ MODEL2    <- list()
 
 for (i in 1 : nlevels(db.metafor$Response)){  
   
-  #subset the predictor
+  # Subset the predictor
   data_i  <- db.metafor[db.metafor$Response == levels(db.metafor$Response)[i], ]
   
-  #fitting the model
+  # Fitting the model
   model_i <- metafor::rma.mv(yi, vi, random =  ~ 1 | Paper_ID, data = na.omit(data_i),
                              control=list(rel.tol=1e-8)) 
   
-  model2_i <- rma.mv(yi, vi, mods = ~ Ecology, 
-                    random = ~ 1 | Paper_ID, 
-                    data = na.omit(data_i),
-                    control=list(rel.tol=1e-8))
+  # Validation
+  failsafe_i <- fsn(yi, vi, type = "Rosenthal", data = na.omit(data_i)) 
   
-  
-  #extracting coefficients
+  # Extracting coefficients
   result_for_plot_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
                                                 " (" ,
                                                 nrow(data_i),", ",
                                                 length(unique(data_i$Paper_ID)),")",sep=''),
+                                  n_studies =  length(unique(data_i$Paper_ID)),
+                                  Type = data_i$Type[1],
                                   b     = model_i$b,
                                   ci.lb = model_i$ci.lb,
                                   ci.ub = model_i$ci.ub,
                                   ES    = ((exp(model_i$b)-1))/((exp(model_i$b)+1)),
                                   L     = ((exp(model_i$ci.lb)-1)/(exp(model_i$ci.lb)+1)),
-                                  U     = ((exp(model_i$ci.ub)-1)/(exp(model_i$ci.ub)+1)))
+                                  U     = ((exp(model_i$ci.ub)-1)/(exp(model_i$ci.ub)+1)),
+                                  p = round(model_i$pval,4),
+                                  failsafe_N = failsafe_i$fsnum,
+                                  failsafe_p = round(failsafe_i$pval,3))
   
   table_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
                          N       = nrow(data_i),
                          Beta_SE = paste(round(model_i$beta,2),"+/-", round(model_i$se,2),sep=''),
                          CI = paste(round(model_i$ci.lb,2), " | ", round(model_i$ci.ub,2),sep=''),
-                         p = round(model_i$pval,2))
+                         p = round(model_i$pval,4))
   
-  #metafor
+  # Fitting the model with moderathors
+  model2_i <- rma.mv(yi, vi, mods = ~ Ecology, 
+                     random = ~ 1 | Paper_ID, 
+                     data = na.omit(data_i),
+                     control = list(rel.tol=1e-8))
+
+  data_i_eco  <- data_i[data_i$Paper_ID %in% model2_i$mf.r[[1]]$Paper_ID,]
+  data_i_eco  <- droplevels(data_i_eco)
+  
+  if(nlevels(data_i_eco$Ecology) != nlevels(data_i$Ecology))
+    Ecology_i <- rev(levels(data_i_eco$Ecology))
+  else
+    Ecology_i <- levels(data_i_eco$Ecology)
+  
+  # Extracting coefficients
   result_for_plot2_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
                                                 " (" ,
                                                 nrow(data_i),", ",
                                                 length(unique(data_i$Paper_ID)),")",sep=''),
+                                  Type = data_i$Type[1],
+                                  Ecology = Ecology_i,
                                   b     = model2_i$b,
                                   ci.lb = model2_i$ci.lb,
                                   ci.ub = model2_i$ci.ub,
                                   ES    = ((exp(model2_i$b)-1))/((exp(model2_i$b)+1)),
                                   L     = ((exp(model2_i$ci.lb)-1)/(exp(model2_i$ci.lb)+1)),
-                                  U     = ((exp(model2_i$ci.ub)-1)/(exp(model2_i$ci.ub)+1)))
+                                  U     = ((exp(model2_i$ci.ub)-1)/(exp(model2_i$ci.ub)+1)),
+                                  p = round(model2_i$pval,4))
   
   table2_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
                          N       = nrow(data_i),
@@ -297,47 +320,116 @@ for (i in 1 : nlevels(db.metafor$Response)){
   table_sup_mat2   <- table2_i
     }
 }
-
+rm(i, result_for_plot_i, result_for_plot2_i, table_i, table2_i, data_i_eco, data_i)
+#warnings()
 
 # renaming Response group as in the result_for_plot
 levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
 db.metafor$Yr <- log(db.metafor$Yr +1)
-str(db.metafor)
+
+# Plotting ----------------------------------------------------------------
+
+#Arrange
+result_for_plot$Type <- 
+  factor(result_for_plot$Type, levels = c("Behaviour","Physiology","Population/Community","Habitat")) #Sort
+
+result_for_plot <- result_for_plot %>% arrange(Type, .by_group = FALSE)
+
+result_for_plot$label <- 
+  factor(result_for_plot$label, 
+         levels = rev(as.character(result_for_plot$label))) #Sort
+
+db.metafor$Response <- 
+  factor(db.metafor$Response, 
+         levels = result_for_plot$label) #Sort
+
+colors.type <- c("darkorange","grey10","blue","darkmagenta")
+color.num <- table(result_for_plot$Type)
+
+color.axis.y <- c(rep(colors.type[2], color.num[4]),
+                  rep(colors.type[4], color.num[3]),
+                  rep(colors.type[3], color.num[2]), #
+                  rep(colors.type[1], color.num[1])) #
+
+face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
 
 (forest_plot <- 
     result_for_plot %>%
-    ggplot2::ggplot(aes(x = ES, y = label)) + 
+    ggplot2::ggplot(aes(x = ES, y = label, fill = Type, col = Type)) + 
     geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
-    geom_jitter(data = db.metafor, aes(y = Response, x = r, col = Phylum, shape = Domain), 
-                alpha = 0.5, size = 1, width = 0.02)+
-    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0)+
-    geom_point(size = 3, pch = 21, col = "black", fill = "grey10") +
+    geom_jitter(data = db.metafor, 
+                aes(y = Response, x = yi, col = Type, shape = Domain), 
+                alpha = 0.2, stroke = .8, size = 2,  height = 0.1, width = 0.5)+
+    geom_errorbar(aes(xmin = L, xmax = U), size = 1.5, width = 0)+
+    geom_point(size = 4, pch = 21) +
     
     # geom_text(aes(col = Type),label = paste0(round(table.plot.M1.2$Beta, 3), sign.M1.2, sep = "  "), 
     #           vjust = - 1, size = 3) +
     labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
-         y = NULL) +
+         y = NULL) + 
+    scale_color_manual("", 
+                       values = colors.type)+
+    scale_fill_manual("", 
+                       values = colors.type)+
     
-    theme_classic() + theme(#legend.position = "none",
-                            
-                            strip.text.x = element_text(size = 12),
-                            #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
-                            axis.text.x = element_text(size = 11),
-                            axis.title = element_text(size = 13))
-  
+    scale_shape_manual("", values = c(21,24))+
+    
+    theme_bw() + 
+    theme(legend.position = "right", 
+          legend.direction = "vertical",
+          legend.text = element_text(size = 8),
+          axis.title = element_text(size = 12),
+          axis.line.x = element_line(color="grey10"), 
+          axis.line.y = element_line(color="grey10"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10, 
+                                     color = rev(color.axis.y),
+                                     face = face.axis.y),
+          #panel.border = element_blank(),
+          panel.grid.major.x = element_blank(),                                          
+          panel.grid.minor.x = element_blank(),
+          panel.grid.minor.y = element_blank(),
+          panel.grid.major.y = element_blank(),  
+          plot.margin = unit(c(rep(0.4,4)), units = , "cm")
+          )
 )
 
 # Renaming disciplines
-result_for_plot2 <- data.frame(result_for_plot2, 
-                                         Ecology = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
-
-result_for_plot2$Ecology <- as.factor(result_for_plot2$Ecology)
-
-levels(result_for_plot2$Ecology) <- c("Multiple", "Subterranean", "Surface")
+# result_for_plot2 <- data.frame(result_for_plot2,
+#                                          Ecology = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
+# 
+# result_for_plot2$Ecology <- as.factor(result_for_plot2$Ecology)
+# 
+# levels(result_for_plot2$Ecology) <- c("Multiple", "Subterranean", "Surface")
 
 (forest_plot2 <- 
     result_for_plot2 %>%
     ggplot2::ggplot(aes(x = ES, y = label, col = Ecology, fill = Ecology)) + 
+    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
+    
+    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0, position = position_dodge(width = 0.6))+
+    geom_point(size = 3, pch = 21,position = position_dodge(width = 0.6)) +
+    
+    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
+         y = NULL) +
+    
+    theme_classic() + theme(#legend.position = "none",
+      
+      strip.text.x = element_text(size = 12),
+      #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
+      axis.text.x = element_text(size = 11),
+      axis.title = element_text(size = 13))
+  
+)
+
+result_for_plot2 <- data.frame(result_for_plot2,
+                                         Ecology2 = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
+
+result_for_plot2$Ecology2 <- as.factor(result_for_plot2$Ecology2)
+
+(forest_plot2 <- 
+    result_for_plot2 %>%
+    ggplot2::ggplot(aes(x = ES, y = label, col = Ecology2, fill = Ecology2)) + 
     geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
     
     geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0, position = position_dodge(width = 0.6))+
