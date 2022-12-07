@@ -21,6 +21,7 @@ rm(list = ls())
 library("dplyr")
 library("metafor")   
 library("ggplot2")
+library("ggpubr")
 library("ggthemes")
 library("png")
 library("tidyverse")
@@ -231,6 +232,8 @@ db.metafor <- droplevels(db.metafor) #dropped a study on Morphology
 MODEL     <- list()
 MODEL2    <- list()
 
+i=13
+
 for (i in 1 : nlevels(db.metafor$Response)){  
   
   # Subset the predictor
@@ -272,20 +275,28 @@ for (i in 1 : nlevels(db.metafor$Response)){
                      data = na.omit(data_i),
                      control = list(rel.tol=1e-8))
 
+  #Adding missing level in the database
   data_i_eco  <- data_i[data_i$Paper_ID %in% model2_i$mf.r[[1]]$Paper_ID,]
   data_i_eco  <- droplevels(data_i_eco)
   
-  if(nlevels(data_i_eco$Ecology) != nlevels(data_i$Ecology))
-    Ecology_i <- rev(levels(data_i_eco$Ecology))
-  else
+  if(nlevels(data_i_eco$Ecology) == 1) {
     Ecology_i <- levels(data_i_eco$Ecology)
-  
+  }
+  else if(nlevels(data_i_eco$Ecology) < 3){
+    non.baseline <- gsub('[Ecology]','', rownames(model2_i$b)[2])
+    Ecology_i <- levels(data_i_eco$Ecology)
+    
+    baseline <- Ecology_i[! Ecology_i %in% non.baseline]
+    Ecology_i <- c(baseline,non.baseline)
+    
+  } else { Ecology_i <- levels(data_i_eco$Ecology) }
+
   # Extracting coefficients
   result_for_plot2_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
                                                 " (" ,
                                                 nrow(data_i),", ",
                                                 length(unique(data_i$Paper_ID)),")",sep=''),
-                                  Type = data_i$Type[1],
+                                  Type = rep(data_i$Type[1],length(Ecology_i)),
                                   Ecology = Ecology_i,
                                   b     = model2_i$b,
                                   ci.lb = model2_i$ci.lb,
@@ -353,7 +364,7 @@ color.axis.y <- c(rep(colors.type[2], color.num[4]),
 
 face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
 
-(forest_plot <- 
+(forest_plot1 <- 
     result_for_plot %>%
     ggplot2::ggplot(aes(x = ES, y = label, fill = Type, col = Type)) + 
     geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
@@ -373,7 +384,7 @@ face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
                        values = colors.type)+
     
     scale_shape_manual("", values = c(21,24))+
-    
+    #guides(color = TRUE,fill = TRUE)+
     theme_bw() + 
     theme(legend.position = "right", 
           legend.direction = "vertical",
@@ -388,64 +399,99 @@ face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
           #panel.border = element_blank(),
           panel.grid.major.x = element_blank(),                                          
           panel.grid.minor.x = element_blank(),
-          panel.grid.minor.y = element_blank(),
-          panel.grid.major.y = element_blank(),  
+          # panel.grid.minor.y = element_blank(),
+          # panel.grid.major.y = element_blank(),  
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
           )
 )
 
 # Renaming disciplines
+
+#Arrange
+result_for_plot2$Type <- 
+  factor(result_for_plot2$Type, levels = c("Behaviour","Physiology","Population/Community","Habitat")) #Sort
+
+result_for_plot2 <- result_for_plot2 %>% arrange(Type, .by_group = FALSE)
+
+result_for_plot2$label <- 
+  factor(result_for_plot2$label, 
+         levels = unique(result_for_plot2$label)) #Sort
+
+(forest_plot2 <- 
+    result_for_plot2 %>%
+    ggplot2::ggplot(aes(x = ES, 
+                        y = label,
+                        shape = Ecology)) + 
+    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
+    
+    geom_errorbar(aes(xmin = L, xmax = U),col = "grey10", size = .5, width = 0, position = position_dodge(width = 0.6))+
+    geom_point(aes(fill = Ecology), size = 3, col = "grey10", stroke = .5, position = position_dodge(width = 0.6)) +
+    
+    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
+         y = NULL) +
+    
+    # scale_color_manual("", 
+    #                    values = colors.type)+
+    scale_fill_manual("",
+                      values = c("grey10","mediumorchid2","lightcyan1"))+
+
+    
+    scale_shape_manual("", values = c(21,22,24))+
+    theme_bw() + 
+    theme(legend.position = "right", 
+          legend.direction = "vertical",
+          legend.text = element_text(size = 8),
+          axis.title = element_text(size = 12),
+          axis.line.x = element_line(color="grey10"), 
+          axis.line.y = element_line(color="grey10"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10, 
+                                     color = rev(color.axis.y)),
+                                     #face = face.axis.y),
+          #panel.border = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          # panel.grid.minor.y = element_blank(),
+          # panel.grid.major.y = element_blank(),
+          plot.margin = unit(c(rep(0.4,4)), units = , "cm")
+    ))
+
+pdf(file = "Figures/Figure_1.pdf", width = 8, height = 5)
+plot.map
+dev.off()
+
+pdf(file = "Figures/Figure_2.pdf", width = 8, height = 5)
+forest_plot1
+dev.off()
+
+pdf(file = "Figures/Figure_3.pdf", width = 8, height = 5)
+forest_plot2
+dev.off()
+
 # result_for_plot2 <- data.frame(result_for_plot2,
-#                                          Ecology = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
+#                                          Ecology2 = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
 # 
-# result_for_plot2$Ecology <- as.factor(result_for_plot2$Ecology)
+# result_for_plot2$Ecology2 <- as.factor(result_for_plot2$Ecology2)
 # 
-# levels(result_for_plot2$Ecology) <- c("Multiple", "Subterranean", "Surface")
-
-(forest_plot2 <- 
-    result_for_plot2 %>%
-    ggplot2::ggplot(aes(x = ES, y = label, col = Ecology, fill = Ecology)) + 
-    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
-    
-    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0, position = position_dodge(width = 0.6))+
-    geom_point(size = 3, pch = 21,position = position_dodge(width = 0.6)) +
-    
-    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
-         y = NULL) +
-    
-    theme_classic() + theme(#legend.position = "none",
-      
-      strip.text.x = element_text(size = 12),
-      #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
-      axis.text.x = element_text(size = 11),
-      axis.title = element_text(size = 13))
-  
-)
-
-result_for_plot2 <- data.frame(result_for_plot2,
-                                         Ecology2 = gsub("[[:digit:]]", "", rownames(result_for_plot2)))
-
-result_for_plot2$Ecology2 <- as.factor(result_for_plot2$Ecology2)
-
-(forest_plot2 <- 
-    result_for_plot2 %>%
-    ggplot2::ggplot(aes(x = ES, y = label, col = Ecology2, fill = Ecology2)) + 
-    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
-    
-    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0, position = position_dodge(width = 0.6))+
-    geom_point(size = 3, pch = 21,position = position_dodge(width = 0.6)) +
-    
-    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
-         y = NULL) +
-    
-    theme_classic() + theme(#legend.position = "none",
-      
-      strip.text.x = element_text(size = 12),
-      #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
-      axis.text.x = element_text(size = 11),
-      axis.title = element_text(size = 13))
-  
-)
+# (forest_plot2 <- 
+#     result_for_plot2 %>%
+#     ggplot2::ggplot(aes(x = ES, y = label, col = Ecology2, fill = Ecology2)) + 
+#     geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
+#     
+#     geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0, position = position_dodge(width = 0.6))+
+#     geom_point(size = 3, pch = 21,position = position_dodge(width = 0.6)) +
+#     
+#     labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
+#          y = NULL) +
+#     
+#     theme_classic() + theme(#legend.position = "none",
+#       
+#       strip.text.x = element_text(size = 12),
+#       #axis.text.y = element_text(colour = rev(color.axis),size = 12), 
+#       axis.text.x = element_text(size = 11),
+#       axis.title = element_text(size = 13))
+#   
+# )
 
 
 # Modelling
