@@ -24,6 +24,7 @@ library("ggplot2")
 library("ggpubr")
 library("ggthemes")
 library("png")
+library("stringr")
 library("tidyverse")
 library("tidylog")
 
@@ -70,7 +71,6 @@ db.meta.distinct <- db.meta %>%
                     dplyr::distinct(Paper_ID, .keep_all = TRUE) 
 
 # Extracting temporal range of each study ---------------------------------
-# Extracting year for each study ------------------------------------------
 
 #Calculating year range for the dataset analysed by each scientometric article
 
@@ -91,7 +91,12 @@ for (i in 1 : nrow(db.meta)){
   if(is.na(Year) == TRUE) { 
     Yr_min   <- c(Yr_min, NA)
     Yr_max   <- c(Yr_max, NA)
-    Yr_range <- c(Yr_range, NA) } else {
+    Yr_range <- c(Yr_range, NA) } 
+  else if (length(Year) == 1) { 
+    Yr_min   <- c(Yr_min, Year)
+    Yr_max   <- c(Yr_max, Year)
+    Yr_range <- c(Yr_range, 1)
+  } else {
     Yr_min   <- c(Yr_min, range(Year)[1])
     Yr_max   <- c(Yr_max, range(Year)[2])
     Yr_range <- c(Yr_range, (range(Year)[2] - range(Year)[1])) }
@@ -104,6 +109,13 @@ range(Yr_min,   na.rm = TRUE)
 range(Yr_range, na.rm = TRUE)
 
 db.meta <- data.frame(db.meta, Yr_min, Yr_max, Yr_range) ; head(db.meta)
+
+# Cleaning p value --------------------------------------------------------
+
+db.meta$P.value <- stringr::str_replace(db.meta$P.value, "<", "")
+db.meta$P.value <- stringr::str_replace(db.meta$P.value, ">", "")
+db.meta$P.value <- stringr::str_replace(db.meta$P.value, ",", ".")
+db.meta$P.value <- as.numeric(db.meta$P.value)
 
 # Summary stats -----------------------------------------------------------
 
@@ -200,14 +212,23 @@ db.metafor <- db.meta %>% dplyr::select(Paper_ID,
                                         Domain,
                                         Yr = Yr_range,
                                         Phylum,
+                                        Class,
                                         Ecology  = Ecology_group,
                                         Response = Response_Group,
                                         Type = Response_macrogroup,
                                         N,
+                                        p = P.value,
                                         r = Pearson_r_conversion)
+
 
 # Derive Fischer's Z and its variance
 db.metafor <- metafor::escalc(measure = "COR", ri = r, ni = N, data = db.metafor)
+
+# Fisher’s r-to-z transformation is a variance stabilizing transformation 
+# for correlation coefficients with the added benefit of also being a rather effective 
+# normalizing transformation (Fisher 1921). 
+# The Fisher’s r-to-z transformed correlation coefficient is equal to:
+# 1/2 * log((1 + ri)/(1 - ri)).
 
 #Check sample size for each predictors
 table_estimates <- data.frame(predictor = NULL, n = NULL, n_papers = NULL)
@@ -232,8 +253,6 @@ db.metafor <- droplevels(db.metafor) #dropped a study on Morphology
 MODEL     <- list()
 MODEL2    <- list()
 
-i=13
-
 for (i in 1 : nlevels(db.metafor$Response)){  
   
   # Subset the predictor
@@ -242,9 +261,6 @@ for (i in 1 : nlevels(db.metafor$Response)){
   # Fitting the model
   model_i <- metafor::rma.mv(yi, vi, random =  ~ 1 | Paper_ID, data = na.omit(data_i),
                              control=list(rel.tol=1e-8)) 
-  
-  # Validation
-  failsafe_i <- fsn(yi, vi, type = "Rosenthal", data = na.omit(data_i)) 
   
   # Extracting coefficients
   result_for_plot_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
@@ -259,9 +275,7 @@ for (i in 1 : nlevels(db.metafor$Response)){
                                   ES    = ((exp(model_i$b)-1))/((exp(model_i$b)+1)),
                                   L     = ((exp(model_i$ci.lb)-1)/(exp(model_i$ci.lb)+1)),
                                   U     = ((exp(model_i$ci.ub)-1)/(exp(model_i$ci.ub)+1)),
-                                  p = round(model_i$pval,4),
-                                  failsafe_N = failsafe_i$fsnum,
-                                  failsafe_p = round(failsafe_i$pval,3))
+                                  p = round(model_i$pval,4))
   
   table_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
                          N       = nrow(data_i),
@@ -330,13 +344,52 @@ for (i in 1 : nlevels(db.metafor$Response)){
   result_for_plot2 <- result_for_plot2_i
   table_sup_mat2   <- table2_i
     }
-}
-rm(i, result_for_plot_i, result_for_plot2_i, table_i, table2_i, data_i_eco, data_i)
+} 
+rm(i, model_i, model2_i; result_for_plot_i, result_for_plot2_i, table_i, table2_i, data_i_eco, data_i)
 #warnings()
 
 # renaming Response group as in the result_for_plot
 levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
-db.metafor$Yr <- log(db.metafor$Yr +1)
+
+
+preds <- predict(MODEL[[13]], transf = exp)
+wi <- 1/sqrt(data_i$vi)
+size <- 0.5 + 3 * (wi - min(wi))/(max(wi) - min(wi))
+plot(data_i$Yr, exp(data_i$yi), pch = 19, cex = size,
+     xlab = "Range yr", ylab = "r",
+     las = 1, bty = "l", log = "y")
+lines(min(data_i$Yr):max(data_i$Yr), preds$pred)
+lines(min(data_i$Yr):max(data_i$Yr), preds$ci.lb, lty = "dashed")
+lines(min(data_i$Yr):max(data_i$Yr), preds$ci.ub, lty = "dashed")
+abline(h = 1, lty = "dotted")
+
+
+
+
+# Evaluation of publication bias --------------------------------------------------------
+
+rosenthal_N <- c()
+rosenthal_p <- c()
+
+for (i in 1 : nlevels(db.metafor$Response)){  
+  
+  # Subset the predictor
+  data_i  <- db.metafor[db.metafor$Response == levels(db.metafor$Response)[i], ]
+  
+  # Validation
+  failsafe_rosenthal <- metafor::fsn(yi = yi, vi = vi, data = na.omit(data_i), 
+                                     type = "Rosenthal") 
+  # failsafe_rosenberg <- metafor::fsn(yi = yi, vi = vi, data = na.omit(data_i), 
+  #                                     type = "Rosenberg") 
+  
+  rosenthal_N <- c(rosenthal_N, failsafe_rosenthal$fsnum)
+  rosenthal_p <- c(rosenthal_p, round(failsafe_rosenthal$pval,3))
+  
+  funnel(MODEL2[[i]], main = levels(db.metafor$Response)[i])
+  #regtest(MODEL2[[i]], predictor = "ni")
+  # rosenberg_N <- c(rosenberg_N, failsafe_rosenberg$fsnum)
+  # rosenberg_p <- c(rosenberg_p, round(failsafe_rosenberg$pval,3))
+}
 
 # Plotting ----------------------------------------------------------------
 
@@ -362,22 +415,22 @@ color.axis.y <- c(rep(colors.type[2], color.num[4]),
                   rep(colors.type[3], color.num[2]), #
                   rep(colors.type[1], color.num[1])) #
 
-face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
+face.axis.y   <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
+p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
 
 (forest_plot1 <- 
     result_for_plot %>%
     ggplot2::ggplot(aes(x = ES, y = label, fill = Type, col = Type)) + 
-    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
-    geom_jitter(data = db.metafor, 
-                aes(y = Response, x = yi, col = Type, shape = Domain), 
-                alpha = 0.2, stroke = .8, size = 2,  height = 0.1, width = 0.5)+
-    geom_errorbar(aes(xmin = L, xmax = U), size = 1.5, width = 0)+
-    geom_point(size = 4, pch = 21) +
+    geom_vline(lty = 3, size = 0.5, col = "grey10", xintercept = 0) +
+    geom_jitter(data = db.metafor,
+                aes(y = Response, x = yi, col = Type, shape = Domain),
+                alpha = 0, stroke = .8, size = 0,  height = 0.1, width = 0.5)+
+    geom_errorbar(aes(xmin = L, xmax = U), size = 1, width = 0)+
+    geom_point(size = 3, pch = 21) +
     
-    xlim(-1.2,1.2)+
+    geom_text(aes(col = Type),label = paste0(round(result_for_plot$b, 3), p.values.meta, sep = " "), vjust = - 1, size = 3.5) +
     
-    # geom_text(aes(col = Type),label = paste0(round(table.plot.M1.2$Beta, 3), sign.M1.2, sep = "  "), 
-    #           vjust = - 1, size = 3) +
+    xlim(-0.6,0.6)+
     labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
          y = NULL) + 
     scale_color_manual("", 
@@ -385,19 +438,19 @@ face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
     scale_fill_manual("", 
                        values = colors.type)+
     
-    scale_shape_manual("", values = c(21,24))+
+    #scale_shape_manual("", values = c(21,24))+
     #guides(color = TRUE,fill = TRUE)+
     theme_bw() + 
-    theme(legend.position = "right", 
-          legend.direction = "vertical",
+    theme(legend.position = "none", 
+          #legend.direction = "vertical",
           legend.text = element_text(size = 8),
           axis.title = element_text(size = 12),
           axis.line.x = element_line(color="grey10"), 
           axis.line.y = element_line(color="grey10"),
           axis.text.x = element_text(size = 10), 
           axis.text.y = element_text(size = 10, 
-                                     color = rev(color.axis.y),
-                                     face = face.axis.y),
+                                     color = rev(color.axis.y)),
+                                     #face = face.axis.y),
           #panel.border = element_blank(),
           panel.grid.major.x = element_blank(),                                          
           panel.grid.minor.x = element_blank(),
@@ -406,6 +459,51 @@ face.axis.y <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
           )
 )
+
+(boxplot.forest_plot1 <- db.metafor %>% 
+    ggplot(aes(x = r, y = Response, col = Type, fill = Type)) +
+    geom_vline(lty = 3, size = 0.5, col = "grey10", xintercept = 0) +
+    #geom_flat_violin(alpha = 0.8) +
+    geom_point(aes(size = Yr, shape = Domain), 
+               position = position_jitter(width = 0.35), alpha = 0.3) +
+    geom_boxplot(width = .8, outlier.shape = NA, alpha =0) +
+    labs(x = "Effect size [r]", 
+         y = NULL) +
+  xlim(-1,1)+
+  scale_color_manual("Response type", 
+                     values = colors.type)+
+  scale_fill_manual("Response type", 
+                    values = colors.type)+
+  scale_size("Temporal scale (Years)",
+             breaks = c(1,10,50,100))+
+  scale_shape_manual("Domain", 
+                     values = c(21,24))+
+  
+  theme_bw() + 
+  theme(legend.position = "right", 
+        legend.direction = "vertical",
+        legend.text = element_text(size = 8),
+        axis.title = element_text(size = 12),
+        axis.line.x = element_line(color="grey10"), 
+        axis.line.y = element_line(color="grey10"),
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 0, 
+                                   color = rev(color.axis.y),
+                                   face = face.axis.y),
+        #panel.border = element_blank(),
+        panel.grid.major.x = element_blank(),                                          
+        panel.grid.minor.x = element_blank(),
+        # panel.grid.minor.y = element_blank(),
+        # panel.grid.major.y = element_blank(),  
+        plot.margin = unit(c(rep(0.4,4)), units = , "cm")
+  )
+)
+
+pdf(file = "Figures/Figure_2.pdf", width = 14, height = 6)
+ggpubr::ggarrange(forest_plot1, boxplot.forest_plot1, hjust = -0.2,
+                  ncol = 2, nrow = 1, labels = c("A", "B"))
+dev.off()
+
 
 # Renaming disciplines
 
@@ -428,7 +526,7 @@ result_for_plot2$label <-
     
     geom_errorbar(aes(xmin = L, xmax = U),col = "grey10", size = .5, width = 0, position = position_dodge(width = 0.6))+
     geom_point(aes(fill = Ecology), size = 3, col = "grey10", stroke = .5, position = position_dodge(width = 0.6)) +
-    
+  
     labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
          y = NULL) +
     
@@ -472,20 +570,14 @@ pdf(file = "Figures/Figure_3.pdf", width = 8, height = 5)
 forest_plot2
 dev.off()
 
-pdf(file = "Figures/Figure_2bis.pdf", width = 14, height = 5)
-ggpubr::ggarrange(forest_plot1, forest_plot2, ncol = 2, nrow = 1, labels = c("A", "B"))
-dev.off()
-
-
-
 (plotS2a <- db.metafor %>% 
     group_by(Class) %>%
     mutate(median_yi = median(yi, na.rm=T),
            n = n()) %>%
     ungroup() %>%
-    arrange(desc(kingdom),phylum) %>%
-    mutate(phylum = factor(phylum, levels = unique(.$phylum))) %>%
-    ggplot(aes(x = yi, y = phylum)) +
+    arrange(desc(Phylum),Class) %>%
+    mutate(Class = factor(Class, levels = unique(.$Class))) %>%
+    ggplot(aes(x = yi, y = Class)) +
     geom_point(position = position_jitter(width = 0.35), size = 1, alpha = 0.3) +
     geom_boxplot(width = .8, outlier.shape = NA, alpha = 0.2, col = "grey20") +
     labs(x = "Estimates", y = NULL) +
