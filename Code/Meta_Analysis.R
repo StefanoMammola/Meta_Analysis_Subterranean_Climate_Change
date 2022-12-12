@@ -172,13 +172,12 @@ world <- ggplot2::map_data("world")
   scale_fill_manual("Type of study",values = c("turquoise","orange","white","blue"))+
     guides(fill=guide_legend(title=NULL),
            size=guide_legend(title=NULL))+
-    #scale_y_continuous(breaks = (-2:2) * 30) +
     scale_x_continuous(breaks = (-4:4) * 45) +
   ggthemes::theme_map()+
     theme(legend.position = c(0.05,0.2),
           legend.background=element_rect(fill = alpha("white", 0))))
 
-rm(world)
+rm(world) #cleaning
 
 # Temporal trend ----------------------------------------------------------
 
@@ -251,7 +250,7 @@ for(i in 1:length(unique(levels(db.metafor$Response))))
 db.metafor <- db.metafor[!(db.metafor$Response %in% table_estimates[table_estimates$n_papers < 2,]$predictor),]
 db.metafor <- droplevels(db.metafor) #dropped a study on Morphology
 
-rm(i, table_estimates)
+rm(i, table_estimates) #cleaning
 
 # Fitting the metafor models ----------------------------------------------
 
@@ -360,9 +359,9 @@ for (i in 1 : nlevels(db.metafor$Response)){
   
   
   # Store the data 
-  MODEL[[i]]      <- model_i
-  MODEL2[[i]]      <- model2_i
-  MODEL3[[i]]      <- model3_i
+  MODEL[[i]]  <- model_i
+  MODEL2[[i]] <- model2_i
+  MODEL3[[i]] <- model3_i
   
   # Store tables
   if(i > 1) {    
@@ -370,15 +369,14 @@ for (i in 1 : nlevels(db.metafor$Response)){
     result_for_plot2 <- rbind(result_for_plot2,result_for_plot2_i)
     result_for_plot3 <- rbind(result_for_plot3,result_for_plot3_i)
     } else {
-  result_for_plot <- result_for_plot_i
+  result_for_plot  <- result_for_plot_i
   result_for_plot2 <- result_for_plot2_i
   result_for_plot3 <- result_for_plot3_i
     }
 } 
 rm(i, data_i_eco, data_i_dom, data_i, Domain_i, Ecology_i, baseline, non.baseline,
    model_i, model2_i, model3_i, 
-   result_for_plot_i, result_for_plot2_i, result_for_plot3_i)
-#warnings()
+   result_for_plot_i, result_for_plot2_i, result_for_plot3_i) #cleaning
 
 # renaming Response group as in the result_for_plot
 levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
@@ -406,7 +404,7 @@ for (i in 1 : nlevels(db.metafor$Response)){
   # rosenberg_p <- c(rosenberg_p, round(failsafe_rosenberg$pval,3))
 }
 
-rm(i, data_i, failsafe_rosenthal)
+rm(i, data_i, failsafe_rosenthal) #cleaning
 
 # Plotting ----------------------------------------------------------------
 
@@ -455,11 +453,9 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
     scale_fill_manual("", 
                        values = colors.type)+
     
-    #scale_shape_manual("", values = c(21,24))+
     #guides(color = TRUE,fill = TRUE)+
     theme_bw() + 
-    theme(legend.position = "none", 
-          #legend.direction = "vertical",
+    theme(legend.position = "none",
           legend.text = element_text(size = 8),
           axis.title = element_text(size = 12),
           axis.line.x = element_line(color="grey10"), 
@@ -467,12 +463,8 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
           axis.text.x = element_text(size = 10), 
           axis.text.y = element_text(size = 10, 
                                      color = rev(color.axis.y)),
-                                     #face = face.axis.y),
-          #panel.border = element_blank(),
           panel.grid.major.x = element_blank(),                                          
           panel.grid.minor.x = element_blank(),
-          # panel.grid.minor.y = element_blank(),
-          # panel.grid.major.y = element_blank(),  
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
           )
 )
@@ -480,7 +472,6 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
 (boxplot.forest_plot1 <- db.metafor %>% 
     ggplot(aes(x = r, y = Response, col = Type, fill = Type)) +
     geom_vline(lty = 3, size = 0.5, col = "grey10", xintercept = 0) +
-    #geom_flat_violin(alpha = 0.8) +
     geom_point(aes(size = Yr, shape = Domain), 
                position = position_jitter(width = 0.35), alpha = 0.3) +
     geom_boxplot(width = .8, outlier.shape = NA, alpha =0) +
@@ -507,11 +498,8 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
         axis.text.y = element_text(size = 0, 
                                    color = rev(color.axis.y),
                                    face = face.axis.y),
-        #panel.border = element_blank(),
         panel.grid.major.x = element_blank(),                                          
         panel.grid.minor.x = element_blank(),
-        # panel.grid.minor.y = element_blank(),
-        # panel.grid.major.y = element_blank(),  
         plot.margin = unit(c(rep(0.4,4)), units = , "cm")
   )
 )
@@ -558,12 +546,8 @@ result_for_plot2$label <-
           axis.text.x = element_text(size = 10), 
           axis.text.y = element_text(size = 10, 
                                      color = rev(color.axis.y)),
-                                     #face = face.axis.y),
-          #panel.border = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.grid.minor.x = element_blank(),
-          # panel.grid.minor.y = element_blank(),
-          # panel.grid.major.y = element_blank(),
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
     ))
 
@@ -606,14 +590,13 @@ result_for_plot3$label <-
           axis.text.x = element_text(size = 10), 
           axis.text.y = element_text(size = 10, 
                                      color = rev(color.axis.y)),
-          #face = face.axis.y),
-          #panel.border = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.grid.minor.x = element_blank(),
-          # panel.grid.minor.y = element_blank(),
-          # panel.grid.major.y = element_blank(),
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
     ))
+
+
+# Saving the plots --------------------------------------------------------
 
 pdf(file = "Figures/Figure_1.pdf", width = 10, height = 5)
 plot.year  + annotation_custom(ggplotGrob(plot.map),xmin=1983,xmax=2013,ymin=3,ymax=10)
