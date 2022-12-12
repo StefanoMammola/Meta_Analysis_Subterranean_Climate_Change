@@ -110,6 +110,8 @@ range(Yr_range, na.rm = TRUE)
 
 db.meta <- data.frame(db.meta, Yr_min, Yr_max, Yr_range) ; head(db.meta)
 
+rm(i, Year, Yr_min, Yr_max, Yr_range, Data_i)
+
 # Cleaning p value --------------------------------------------------------
 
 db.meta$P.value <- stringr::str_replace(db.meta$P.value, "<", "")
@@ -175,6 +177,8 @@ world <- ggplot2::map_data("world")
   ggthemes::theme_map()+
     theme(legend.position = c(0.05,0.2),
           legend.background=element_rect(fill = alpha("white", 0))))
+
+rm(world)
 
 # Temporal trend ----------------------------------------------------------
 
@@ -247,11 +251,14 @@ for(i in 1:length(unique(levels(db.metafor$Response))))
 db.metafor <- db.metafor[!(db.metafor$Response %in% table_estimates[table_estimates$n_papers < 2,]$predictor),]
 db.metafor <- droplevels(db.metafor) #dropped a study on Morphology
 
+rm(i, table_estimates)
+
 # Fitting the metafor models ----------------------------------------------
 
 #Fitting the models
 MODEL     <- list()
 MODEL2    <- list()
+MODEL3    <- list()
 
 for (i in 1 : nlevels(db.metafor$Response)){  
   
@@ -263,7 +270,8 @@ for (i in 1 : nlevels(db.metafor$Response)){
                              control=list(rel.tol=1e-8)) 
   
   # Extracting coefficients
-  result_for_plot_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
+  result_for_plot_i <- data.frame(original_label = levels(db.metafor$Response)[i],
+                                  label = paste(levels(db.metafor$Response)[i],
                                                 " (" ,
                                                 nrow(data_i),", ",
                                                 length(unique(data_i$Paper_ID)),")",sep=''),
@@ -276,20 +284,14 @@ for (i in 1 : nlevels(db.metafor$Response)){
                                   L     = ((exp(model_i$ci.lb)-1)/(exp(model_i$ci.lb)+1)),
                                   U     = ((exp(model_i$ci.ub)-1)/(exp(model_i$ci.ub)+1)),
                                   p = round(model_i$pval,4))
-  
-  table_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
-                         N       = nrow(data_i),
-                         Beta_SE = paste(round(model_i$beta,2),"+/-", round(model_i$se,2),sep=''),
-                         CI = paste(round(model_i$ci.lb,2), " | ", round(model_i$ci.ub,2),sep=''),
-                         p = round(model_i$pval,4))
-  
-  # Fitting the model with moderathors
+
+  # Fitting the model with moderator Ecology
   model2_i <- rma.mv(yi, vi, mods = ~ Ecology, 
                      random = ~ 1 | Paper_ID, 
                      data = na.omit(data_i),
                      control = list(rel.tol=1e-8))
 
-  #Adding missing level in the database
+  # Adding missing level in the database
   data_i_eco  <- data_i[data_i$Paper_ID %in% model2_i$mf.r[[1]]$Paper_ID,]
   data_i_eco  <- droplevels(data_i_eco)
   
@@ -297,7 +299,7 @@ for (i in 1 : nlevels(db.metafor$Response)){
     Ecology_i <- levels(data_i_eco$Ecology)
   }
   else if(nlevels(data_i_eco$Ecology) < 3){
-    non.baseline <- gsub('[Ecology]','', rownames(model2_i$b)[2])
+    non.baseline <- gsub('Ecology','', rownames(model2_i$b)[2])
     Ecology_i <- levels(data_i_eco$Ecology)
     
     baseline <- Ecology_i[! Ecology_i %in% non.baseline]
@@ -306,10 +308,10 @@ for (i in 1 : nlevels(db.metafor$Response)){
   } else { Ecology_i <- levels(data_i_eco$Ecology) }
 
   # Extracting coefficients
-  result_for_plot2_i <- data.frame(label = paste(levels(db.metafor$Response)[i],
-                                                " (" ,
-                                                nrow(data_i),", ",
-                                                length(unique(data_i$Paper_ID)),")",sep=''),
+  result_for_plot2_i <- data.frame(original_label = rep(levels(db.metafor$Response)[i],length(Ecology_i)),
+                                  label = rep(paste(levels(db.metafor$Response)[i],
+                                                " (" , nrow(data_i),", ",
+                                                length(unique(data_i$Paper_ID)),")",sep=''),length(Ecology_i)),
                                   Type = rep(data_i$Type[1],length(Ecology_i)),
                                   Ecology = Ecology_i,
                                   b     = model2_i$b,
@@ -320,51 +322,66 @@ for (i in 1 : nlevels(db.metafor$Response)){
                                   U     = ((exp(model2_i$ci.ub)-1)/(exp(model2_i$ci.ub)+1)),
                                   p = round(model2_i$pval,4))
   
-  table2_i <-  data.frame(Predictor = levels(db.metafor$Response)[i],
-                         N       = nrow(data_i),
-                         Beta_SE = paste(round(model2_i$beta,2),"+/-", round(model2_i$se,2),sep=''),
-                         CI = paste(round(model2_i$ci.lb,2), " | ", round(model2_i$ci.ub,2),sep=''),
-                         p = round(model_i$pval,2))
+  # Fitting the model with moderator Domain
+  model3_i <- rma.mv(yi, vi, mods = ~ Domain, 
+                     random = ~ 1 | Paper_ID, 
+                     data = na.omit(data_i),
+                     control = list(rel.tol=1e-8))
+  
+  # Adding missing level in the database
+  data_i_dom  <- data_i[data_i$Paper_ID %in% model3_i$mf.r[[1]]$Paper_ID,]
+  data_i_dom  <- droplevels(data_i_dom)
+  
+  if(nlevels(data_i_dom$Domain) == 1) {
+    Domain_i <- levels(data_i_eco$Domain)
+  }
+  else{
+    non.baseline <- gsub('Domain','', rownames(model3_i$b)[2])
+    Domain_i <- levels(data_i_eco$Domain)
+    
+    baseline <- Domain_i[! Domain_i %in% non.baseline]
+    Domain_i <- c(baseline, non.baseline)
+  }
+  
+  # Extracting coefficients
+  result_for_plot3_i <- data.frame(original_label = rep(levels(db.metafor$Response)[i],length(Domain_i)),
+                                   label = rep(paste(levels(db.metafor$Response)[i],
+                                                 " (" , nrow(data_i),", ",
+                                                 length(unique(data_i$Paper_ID)),")",sep=''),length(Domain_i)),
+                                   Type = rep(data_i$Type[1],length(Domain_i)),
+                                   Domain = Domain_i,
+                                   b     = model3_i$b,
+                                   ci.lb = model3_i$ci.lb,
+                                   ci.ub = model3_i$ci.ub,
+                                   ES    = ((exp(model3_i$b)-1))/((exp(model3_i$b)+1)),
+                                   L     = ((exp(model3_i$ci.lb)-1)/(exp(model3_i$ci.lb)+1)),
+                                   U     = ((exp(model3_i$ci.ub)-1)/(exp(model3_i$ci.ub)+1)),
+                                   p = round(model3_i$pval,4))
   
   
   # Store the data 
   MODEL[[i]]      <- model_i
   MODEL2[[i]]      <- model2_i
+  MODEL3[[i]]      <- model3_i
   
   # Store tables
   if(i > 1) {    
     result_for_plot <- rbind(result_for_plot,result_for_plot_i)
-    table_sup_mat   <- rbind(table_sup_mat,table_i)
     result_for_plot2 <- rbind(result_for_plot2,result_for_plot2_i)
-    table_sup_mat2   <- rbind(table_sup_mat2,table2_i)
+    result_for_plot3 <- rbind(result_for_plot3,result_for_plot3_i)
     } else {
   result_for_plot <- result_for_plot_i
-  table_sup_mat   <- table_i
-  
   result_for_plot2 <- result_for_plot2_i
-  table_sup_mat2   <- table2_i
+  result_for_plot3 <- result_for_plot3_i
     }
 } 
-rm(i, model_i, model2_i; result_for_plot_i, result_for_plot2_i, table_i, table2_i, data_i_eco, data_i)
+rm(i, data_i_eco, data_i_dom, data_i, Domain_i, Ecology_i, baseline, non.baseline,
+   model_i, model2_i, model3_i, 
+   result_for_plot_i, result_for_plot2_i, result_for_plot3_i)
 #warnings()
 
 # renaming Response group as in the result_for_plot
 levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
-
-
-preds <- predict(MODEL[[13]], transf = exp)
-wi <- 1/sqrt(data_i$vi)
-size <- 0.5 + 3 * (wi - min(wi))/(max(wi) - min(wi))
-plot(data_i$Yr, exp(data_i$yi), pch = 19, cex = size,
-     xlab = "Range yr", ylab = "r",
-     las = 1, bty = "l", log = "y")
-lines(min(data_i$Yr):max(data_i$Yr), preds$pred)
-lines(min(data_i$Yr):max(data_i$Yr), preds$ci.lb, lty = "dashed")
-lines(min(data_i$Yr):max(data_i$Yr), preds$ci.ub, lty = "dashed")
-abline(h = 1, lty = "dotted")
-
-
-
 
 # Evaluation of publication bias --------------------------------------------------------
 
@@ -379,8 +396,6 @@ for (i in 1 : nlevels(db.metafor$Response)){
   # Validation
   failsafe_rosenthal <- metafor::fsn(yi = yi, vi = vi, data = na.omit(data_i), 
                                      type = "Rosenthal") 
-  # failsafe_rosenberg <- metafor::fsn(yi = yi, vi = vi, data = na.omit(data_i), 
-  #                                     type = "Rosenberg") 
   
   rosenthal_N <- c(rosenthal_N, failsafe_rosenthal$fsnum)
   rosenthal_p <- c(rosenthal_p, round(failsafe_rosenthal$pval,3))
@@ -390,6 +405,8 @@ for (i in 1 : nlevels(db.metafor$Response)){
   # rosenberg_N <- c(rosenberg_N, failsafe_rosenberg$fsnum)
   # rosenberg_p <- c(rosenberg_p, round(failsafe_rosenberg$pval,3))
 }
+
+rm(i, data_i, failsafe_rosenthal)
 
 # Plotting ----------------------------------------------------------------
 
@@ -430,7 +447,7 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
     
     geom_text(aes(col = Type),label = paste0(round(result_for_plot$b, 3), p.values.meta, sep = " "), vjust = - 1, size = 3.5) +
     
-    xlim(-0.6,0.6)+
+    xlim(-1,1)+
     labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
          y = NULL) + 
     scale_color_manual("", 
@@ -499,12 +516,6 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
   )
 )
 
-pdf(file = "Figures/Figure_2.pdf", width = 14, height = 6)
-ggpubr::ggarrange(forest_plot1, boxplot.forest_plot1, hjust = -0.2,
-                  ncol = 2, nrow = 1, labels = c("A", "B"))
-dev.off()
-
-
 # Renaming disciplines
 
 #Arrange
@@ -523,22 +534,20 @@ result_for_plot2$label <-
                         y = label,
                         shape = Ecology)) + 
     geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
-    
+
     geom_errorbar(aes(xmin = L, xmax = U),col = "grey10", size = .5, width = 0, position = position_dodge(width = 0.6))+
     geom_point(aes(fill = Ecology), size = 3, col = "grey10", stroke = .5, position = position_dodge(width = 0.6)) +
   
     labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
          y = NULL) +
     
-    xlim(-1.2,1.2)+
+    xlim(-1,1)+
     
-    # scale_color_manual("", 
-    #                    values = colors.type)+
-    scale_fill_manual("",
-                      values = c("grey10","mediumorchid2","lightcyan1"))+
-
+    scale_fill_manual("Ecology",
+                      values = c("grey60","grey10","white"))+
     
-    scale_shape_manual("", values = c(21,22,24))+
+    scale_shape_manual("Ecology", values = c(23,25,22))+
+    
     theme_bw() + 
     theme(legend.position = "right", 
           legend.direction = "vertical",
@@ -558,35 +567,65 @@ result_for_plot2$label <-
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
     ))
 
-pdf(file = "Figures/Figure_1.pdf", width = 10, height = 5)
-plot.map
-dev.off()
+result_for_plot3$Type <- 
+  factor(result_for_plot3$Type, levels = c("Behaviour","Physiology","Population/Community","Habitat")) #Sort
 
-pdf(file = "Figures/Figure_2.pdf", width = 8, height = 5)
-forest_plot1
-dev.off()
+result_for_plot3 <- result_for_plot3 %>% arrange(Type, .by_group = FALSE)
 
-pdf(file = "Figures/Figure_3.pdf", width = 8, height = 5)
-forest_plot2
-dev.off()
+result_for_plot3$label <- 
+  factor(result_for_plot3$label, 
+         levels = unique(result_for_plot3$label)) #Sort
 
-(plotS2a <- db.metafor %>% 
-    group_by(Class) %>%
-    mutate(median_yi = median(yi, na.rm=T),
-           n = n()) %>%
-    ungroup() %>%
-    arrange(desc(Phylum),Class) %>%
-    mutate(Class = factor(Class, levels = unique(.$Class))) %>%
-    ggplot(aes(x = yi, y = Class)) +
-    geom_point(position = position_jitter(width = 0.35), size = 1, alpha = 0.3) +
-    geom_boxplot(width = .8, outlier.shape = NA, alpha = 0.2, col = "grey20") +
-    labs(x = "Estimates", y = NULL) +
+(forest_plot3 <- 
+    result_for_plot3 %>%
+    ggplot2::ggplot(aes(x = ES, 
+                        y = label,
+                        shape = Domain)) + 
+    geom_vline(lty = 3, size = 0.5, col = "grey50", xintercept = 0) +
     
-    # ggimage::geom_phylopic(aes(x = 1, y = phylum, image = image),
-    #                        size = .2, color = "grey20") +
-    # scale_color_manual(values = custom_color)+
-    # scale_fill_manual(values = custom_color)+
-    scale_x_continuous(trans = scales::pseudo_log_trans(), breaks = c(0, 10, 100, 1000, 10000)) + 
-    theme_classic() +
-    theme(legend.position = "none", axis.text.y = element_text(size = 12)))
+    geom_errorbar(aes(xmin = L, xmax = U),col = "grey10", size = .5, width = 0, position = position_dodge(width = 0.6))+
+    geom_point(aes(fill = Domain), size = 3, col = "grey10", stroke = .5, position = position_dodge(width = 0.6)) +
+    
+    labs(x = expression(paste("Effect size [r]" %+-% "95% Confidence interval")),
+         y = NULL) +
+    
+    xlim(-1,1)+
+    
+    scale_fill_manual("Domain",
+                      values = c("steelblue1","grey30"))+
+    
+    scale_shape_manual("Domain", values = c(21,24))+
+    
+    theme_bw() + 
+    theme(legend.position = "right", 
+          legend.direction = "vertical",
+          legend.text = element_text(size = 8),
+          axis.title = element_text(size = 12),
+          axis.line.x = element_line(color="grey10"), 
+          axis.line.y = element_line(color="grey10"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10, 
+                                     color = rev(color.axis.y)),
+          #face = face.axis.y),
+          #panel.border = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          # panel.grid.minor.y = element_blank(),
+          # panel.grid.major.y = element_blank(),
+          plot.margin = unit(c(rep(0.4,4)), units = , "cm")
+    ))
+
+pdf(file = "Figures/Figure_1.pdf", width = 10, height = 5)
+plot.year  + annotation_custom(ggplotGrob(plot.map),xmin=1983,xmax=2013,ymin=3,ymax=10)
+dev.off()
+
+pdf(file = "Figures/Figure_2.pdf", width = 14, height = 6)
+ggpubr::ggarrange(forest_plot1, boxplot.forest_plot1, hjust = -0.2,
+                  ncol = 2, nrow = 1, labels = c("A", "B"))
+dev.off()
+
+pdf(file = "Figures/Figure_3.pdf", width = 14, height = 6)
+ggpubr::ggarrange(forest_plot2, forest_plot3, hjust = -0.2,
+                  ncol = 2, nrow = 1, labels = c("A", "B"))
+dev.off()
 
