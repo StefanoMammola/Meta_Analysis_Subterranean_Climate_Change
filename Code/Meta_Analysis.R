@@ -154,6 +154,8 @@ db.pub <- db.pub %>%
                      summarise(n = n()),
                    by = "Paper_ID")
 
+levels(db.pub$Study_type)
+
 # Load world map
 world <- ggplot2::map_data("world")
 
