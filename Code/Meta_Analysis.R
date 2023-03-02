@@ -46,7 +46,7 @@ source("Functions/Custom_functions.r")
 db.pub <-
   read.csv(
     file = "Data/publications.csv",
-    sep = '\t',
+    sep = ';',
     dec = ',',
     header = TRUE,
     as.is = FALSE
@@ -58,7 +58,7 @@ str(db.pub)
 db.meta <-
   read.csv(
     file = "Data/meta_analysis.csv",
-    sep = '\t',
+    sep = ';',
     dec = ',',
     header = TRUE,
     as.is = FALSE
@@ -141,6 +141,8 @@ db.meta %>% dplyr::select(Ecology_group) %>% table()
 ###############################################################
 ## Figures:
 ###############################################################
+
+### db.pub <- db.pub[db.pub$Paper_ID %in% db.meta$Paper_ID,]
 
 # Map ---------------------------------------------------------------------
 
@@ -375,8 +377,7 @@ for (i in 1 : nlevels(db.metafor$Response)){
   result_for_plot2 <- result_for_plot2_i
   result_for_plot3 <- result_for_plot3_i
     }
-} 
-rm(i, data_i_eco, data_i_dom, data_i, Domain_i, Ecology_i, baseline, non.baseline,
+}  ; rm(i, data_i_eco, data_i_dom, data_i, Domain_i, Ecology_i, baseline, non.baseline,
    model_i, model2_i, model3_i, 
    result_for_plot_i, result_for_plot2_i, result_for_plot3_i) #cleaning
 
@@ -388,6 +389,8 @@ levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
 rosenthal_N <- c()
 rosenthal_p <- c()
 
+pdf(file = "Figures/Figure_S1.pdf", width = 12, height = 12)
+par(mfrow= c(4,3), mar = c(rep(2,4)))
 for (i in 1 : nlevels(db.metafor$Response)){  
   
   # Subset the predictor
@@ -401,12 +404,9 @@ for (i in 1 : nlevels(db.metafor$Response)){
   rosenthal_p <- c(rosenthal_p, round(failsafe_rosenthal$pval,3))
   
   funnel(MODEL2[[i]], main = levels(db.metafor$Response)[i])
-  #regtest(MODEL2[[i]], predictor = "ni")
-  # rosenberg_N <- c(rosenberg_N, failsafe_rosenberg$fsnum)
-  # rosenberg_p <- c(rosenberg_p, round(failsafe_rosenberg$pval,3))
-}
-
-rm(i, data_i, failsafe_rosenthal) #cleaning
+  
+} ; rm(i, data_i, failsafe_rosenthal) #cleaning
+dev.off()
 
 # Plotting ----------------------------------------------------------------
 
@@ -614,3 +614,26 @@ ggpubr::ggarrange(forest_plot2, forest_plot3, hjust = -0.2,
                   ncol = 2, nrow = 1, labels = c("A", "B"))
 dev.off()
 
+# Saving tables -----------------------------------------------------------
+
+rownames(result_for_plot) <- NULL
+result_for_plot <- result_for_plot[,-c(2:3)]
+colnames(result_for_plot)[1] <- "Predictor"
+result_for_plot[,c(3:ncol(result_for_plot))] <- round(result_for_plot[,c(3:ncol(result_for_plot))],3)
+result_for_plot$p <- ifelse(result_for_plot$p < 0.0001, "<0.001",result_for_plot$p)
+result_for_plot <- result_for_plot %>% mutate_if(is.numeric, as.character)
+result_for_plot <- result_for_plot %>% arrange(Type, .by_group = FALSE)
+
+xlsx::write.xlsx(result_for_plot, "Tables/Table_S1.xlsx")
+
+rownames(result_for_plot3) <- NULL
+result_for_plot3 <- result_for_plot3[,-c(2)]
+colnames(result_for_plot3)[1] <- "Predictor"
+result_for_plot3[,c(4:ncol(result_for_plot3))] <- round(result_for_plot3[,c(4:ncol(result_for_plot3))],3)
+result_for_plot3$p <- ifelse(result_for_plot3$p < 0.0001, "<0.001",result_for_plot3$p)
+result_for_plot3 <- result_for_plot3 %>% mutate_if(is.numeric, as.character)
+result_for_plot3 <- result_for_plot3 %>% arrange(Type, .by_group = FALSE)
+
+xlsx::write.xlsx(result_for_plot3, "Tables/Table_S3.xlsx")
+
+v
