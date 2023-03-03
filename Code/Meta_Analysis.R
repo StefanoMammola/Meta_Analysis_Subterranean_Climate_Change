@@ -64,6 +64,16 @@ db.meta <-
     as.is = FALSE
   )
 
+# Database with traits
+db.trait <-
+  read.csv(
+    file = "Data/trait.csv",
+    sep = ';',
+    dec = ',',
+    header = TRUE,
+    as.is = FALSE
+  )
+
 str(db.meta)
 
 # Database with only one estimate / paper
@@ -407,7 +417,7 @@ for (i in 1 : nlevels(db.metafor$Response)){
   
 } ; rm(i, data_i, failsafe_rosenthal) #cleaning
 dev.off()
-
+?funnel
 # Plotting ----------------------------------------------------------------
 
 #Arrange
@@ -553,6 +563,7 @@ result_for_plot2$label <-
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
     ))
 
+
 result_for_plot3$Type <- 
   factor(result_for_plot3$Type, levels = c("Behaviour","Physiology","Population/Community","Habitat")) #Sort
 
@@ -601,7 +612,7 @@ result_for_plot3$label <-
 # Saving the plots --------------------------------------------------------
 
 pdf(file = "Figures/Figure_1.pdf", width = 10, height = 5)
-plot.year  + annotation_custom(ggplotGrob(plot.map),xmin=1983,xmax=2013,ymin=3,ymax=10)
+plot.year + annotation_custom(ggplotGrob(plot.map),xmin=1983,xmax=2013,ymin=3,ymax=10)
 dev.off()
 
 pdf(file = "Figures/Figure_2.pdf", width = 14, height = 6)
@@ -614,7 +625,75 @@ ggpubr::ggarrange(forest_plot2, forest_plot3, hjust = -0.2,
                   ncol = 2, nrow = 1, labels = c("A", "B"))
 dev.off()
 
+###############################################################
+
+## Trait-Analysis
+
+###############################################################
+
+db.trait2 <- db.trait[db.trait$Response_revised == "LT50", ]
+colnames(db.trait2)
+db.trait2 <- droplevels(db.trait2)
+levels(db.trait2$Class)[c(2, 4)] <- "Crustacea"
+levels(db.trait2$Ecological_Classification_revised) <-
+  c(rep("High", 2), "Low")
+
+db.trait2$Class <-
+  factor(db.trait2$Class, levels = c("Crustacea", "Arachnida", "Insecta")) #Sort
+
+db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class,
+                                  fill = Ecological_Classification_revised)) +
+  #facet_wrap(~Class, nrow = 1,ncol =3)+
+  geom_boxplot(col = "grey10",
+               outlier.shape = NA,
+               alpha = 0.4) +
+  geom_jitter(position = position_jitterdodge(),
+              shape = 21,
+              alpha = 0.6) +
+  geom_vline(xintercept = 1.5, linetype = "dotted") +
+  geom_vline(xintercept = 2.5, linetype = "dotted") +
+  labs(
+    x = NULL,
+    y = "LT50",
+    title = NULL,
+    subtitle = NULL
+  ) +
+  guides(fill = guide_legend(title.position = "top")) +
+  scale_fill_manual("Subterranean specialization", values = c("grey20", "orange")) +
+  theme_custom() +
+  theme(legend.position = "top")
+  
+theme_custom <- function(){
+  theme_bw() +
+    theme(
+      axis.text = element_text(size = 12), 
+      axis.title = element_text(size = 14),
+      axis.line.x = element_line(color="black"), 
+      axis.line.y = element_line(color="black"),
+      panel.border = element_blank(),
+      panel.grid.major.x = element_blank(),                                          
+      panel.grid.minor.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),  
+      plot.margin = unit(c(1, 1, 1, 1), units = , "cm"),
+      plot.title = element_text(size = 15, vjust = 1, hjust = 0),
+      legend.text = element_text(size = 12),          
+      legend.title = element_text(size = 12),                              
+      legend.position = c(0.95, 0.15), 
+      legend.key = element_blank(),
+      legend.background = element_rect(color = "black", 
+                                       fill = "transparent", 
+                                       size = 2, linetype = "blank"))}
+
+
+ggpubr::ggarrange(ploot_1, ploot_1, 
+                  hjust = -0.2,
+                  ncol = 1, nrow = 2, labels = c("A", "B"))
+
+
+
 # Saving tables -----------------------------------------------------------
+result_for_plot
 
 rownames(result_for_plot) <- NULL
 result_for_plot <- result_for_plot[,-c(2:3)]
@@ -624,7 +703,41 @@ result_for_plot$p <- ifelse(result_for_plot$p < 0.0001, "<0.001",result_for_plot
 result_for_plot <- result_for_plot %>% mutate_if(is.numeric, as.character)
 result_for_plot <- result_for_plot %>% arrange(Type, .by_group = FALSE)
 
+result_for_plot$CI = paste0("(",result_for_plot$ci.lb,", ",result_for_plot$ci.ub,")")
+
+result_for_plot <- result_for_plot %>% 
+                   dplyr::select(Predictor,
+                                 Type,
+                                 beta = b,
+                                 SE = ES,
+                                 CI,
+                                 p)
+
+result_for_plot <- data.frame(result_for_plot,
+                              rosenthal_N, 
+                              rosenthal_p = ifelse(rosenthal_p == 0.000, "<0.001", rosenthal_p))
+
 xlsx::write.xlsx(result_for_plot, "Tables/Table_S1.xlsx")
+
+rownames(result_for_plot2) <- NULL
+result_for_plot2 <- result_for_plot2[,-c(2)]
+colnames(result_for_plot2)[1] <- "Predictor"
+result_for_plot2[,c(4:ncol(result_for_plot2))] <- round(result_for_plot2[,c(4:ncol(result_for_plot2))],3)
+result_for_plot2$p <- ifelse(result_for_plot2$p < 0.0001, "<0.001",result_for_plot2$p)
+result_for_plot2 <- result_for_plot2 %>% mutate_if(is.numeric, as.character)
+result_for_plot2 <- result_for_plot2 %>% arrange(Type, .by_group = FALSE)
+
+result_for_plot2$CI = paste0("(",result_for_plot2$ci.lb,", ",result_for_plot2$ci.ub,")")
+
+result_for_plot2 <- result_for_plot2 %>% 
+  dplyr::select(Predictor,
+                Type,
+                beta = b,
+                SE = ES,
+                CI,
+                p)
+
+xlsx::write.xlsx(result_for_plot2, "Tables/Table_S2.xlsx")
 
 rownames(result_for_plot3) <- NULL
 result_for_plot3 <- result_for_plot3[,-c(2)]
@@ -634,6 +747,14 @@ result_for_plot3$p <- ifelse(result_for_plot3$p < 0.0001, "<0.001",result_for_pl
 result_for_plot3 <- result_for_plot3 %>% mutate_if(is.numeric, as.character)
 result_for_plot3 <- result_for_plot3 %>% arrange(Type, .by_group = FALSE)
 
-xlsx::write.xlsx(result_for_plot3, "Tables/Table_S3.xlsx")
+result_for_plot3$CI = paste0("(",result_for_plot3$ci.lb,", ",result_for_plot3$ci.ub,")")
 
-v
+result_for_plot3 <- result_for_plot3 %>% 
+  dplyr::select(Predictor,
+                Type,
+                beta = b,
+                SE = ES,
+                CI,
+                p)
+
+xlsx::write.xlsx(result_for_plot3, "Tables/Table_S3.xlsx")
