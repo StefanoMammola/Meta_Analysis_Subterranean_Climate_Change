@@ -23,6 +23,8 @@ library("metafor")
 library("ggplot2")
 library("ggpubr")
 library("ggthemes")
+library("glmmTMB")
+library("performance")
 library("png")
 library("stringr")
 library("tidyverse")
@@ -30,7 +32,9 @@ library("tidylog")
 
 # Loading pictures ------------------------------------------------------
 
-#Badino_2004 <- png::readPNG("Pictures/492x512.png")
+spider_png      <- png::readPNG("Pictures/spider.png")
+insect_png      <- png::readPNG("Pictures/Leptodirus.png")
+crustacean_png  <- png::readPNG("Pictures/Niphargus.png")
 
 # Sourcing useful functions ------------------------------------------------
 
@@ -209,10 +213,6 @@ rm(world) #cleaning
                                       to=max(db.pub$Year_publication),by=4))+ 
     scale_y_continuous(breaks = seq(from=0,to=10,by=1))+
    
-    # annotation_custom(grid::rasterGrob(Badino_2004),
-    #                  xmin = unit(1990, "native"), xmax = unit(2010,"native"),
-    #                  ymin = unit(3,"npc"),  ymax = unit(5,"npc"))+
-
     labs(x = NULL,
          y = "Number of studies")+
     theme_classic())
@@ -399,7 +399,7 @@ levels(db.metafor$Response) <- levels(as.factor(result_for_plot$label))
 rosenthal_N <- c()
 rosenthal_p <- c()
 
-pdf(file = "Figures/Figure_S1.pdf", width = 12, height = 12)
+pdf(file = "Figures/Figure_S2.pdf", width = 12, height = 12)
 par(mfrow= c(4,3), mar = c(rep(2,4)))
 for (i in 1 : nlevels(db.metafor$Response)){  
   
@@ -516,8 +516,6 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
   )
 )
 
-# Renaming disciplines
-
 #Arrange
 result_for_plot2$Type <- 
   factor(result_for_plot2$Type, levels = c("Behaviour","Physiology","Population/Community","Habitat")) #Sort
@@ -610,16 +608,16 @@ result_for_plot3$label <-
 
 # Saving the plots --------------------------------------------------------
 
-pdf(file = "Figures/Figure_1.pdf", width = 10, height = 5)
+pdf(file = "Figures/Figure_2.pdf", width = 10, height = 5)
 plot.year + annotation_custom(ggplotGrob(plot.map),xmin=1983,xmax=2013,ymin=3,ymax=10)
 dev.off()
 
-pdf(file = "Figures/Figure_2.pdf", width = 14, height = 6)
+pdf(file = "Figures/Figure_3.pdf", width = 14, height = 6)
 ggpubr::ggarrange(forest_plot1, boxplot.forest_plot1, hjust = -0.2,
                   ncol = 2, nrow = 1, labels = c("A", "B"))
 dev.off()
 
-pdf(file = "Figures/Figure_3.pdf", width = 14, height = 6)
+pdf(file = "Figures/Figure_4.pdf", width = 14, height = 6)
 ggpubr::ggarrange(forest_plot2, forest_plot3, hjust = -0.2,
                   ncol = 2, nrow = 1, labels = c("A", "B"))
 dev.off()
@@ -643,15 +641,18 @@ levels(db.trait2$Ecological_Classification) <- c("Low/Null","High","Low/Null")
 
 db.trait2 <- droplevels(db.trait2)
 
-db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, fill = Ecological_Classification)) +
-  #facet_wrap(~ Class, nrow = 1, ncol = 3,scales = "free")+
+(box_4 <- db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, 
+                                  fill = Ecological_Classification)) +
   geom_boxplot(col = "grey10",
                outlier.shape = NA,
-               alpha = 0.4) +
-  geom_point(aes(size = N), shape = 21,
-             position = position_jitterdodge(), color = "grey10",alpha = 0.3) +
-  # geom_jitter(aes(size = N, shape = Methodology), position = position_jitterdodge(),
-  #             alpha = 0.4) +
+               alpha = 0.4,
+               position = position_dodge2(0.65, preserve = "single")) +
+  geom_point(aes(fill = Ecological_Classification, 
+                 size = N, 
+                 shape = Methodology),
+             position = position_dodge2(0.65, preserve = "single"), color = "grey10",alpha = 0.3)+#shape = 21,
+             # position = position_jitterdodge(jitter.width = 0.2, 
+             #                                 dodge.width = 0.9)
   geom_vline(xintercept = 1.5, linetype = "dotted") +
   geom_vline(xintercept = 2.5, linetype = "dotted") +
   labs(
@@ -664,10 +665,23 @@ db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, fill = Ecological_
          size = guide_legend(title.position = "top"),
          shape = guide_legend(title.position = "top")) +
   scale_size_continuous("Sample size") +
-  scale_fill_manual("Subterranean specialization", values = c("white", "grey10")) +
+  scale_fill_manual("Subterranean specialization", values = c("white", "blue")) +
   scale_shape_manual("Experiment type", 
                      values = c(21,24))+
-  theme_bw() +
+  
+  annotation_custom(grid::rasterGrob(spider_png),
+                   xmin = unit(0.9, "native"), xmax = unit(1.4,"native"),
+                   ymin = unit(34,"npc"),  ymax = unit(43.5,"npc"))+
+
+  annotation_custom(grid::rasterGrob(crustacean_png),
+                    xmin = unit(1.9, "native"), xmax = unit(2.4,"native"),
+                    ymin = unit(36,"npc"),  ymax = unit(43.5,"npc"))+
+
+  annotation_custom(grid::rasterGrob(insect_png),
+                    xmin = unit(3.1, "native"), xmax = unit(3.5,"native"),
+                    ymin = unit(36,"npc"),  ymax = unit(43.5,"npc"))+
+  ylim(0, 42)+
+  theme_bw(base_family = "Arial") +
   theme(legend.position = "top", 
         legend.direction = "horizontal",
         legend.text = element_text(size = 8),
@@ -678,28 +692,17 @@ db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, fill = Ecological_
         axis.text.y = element_text(size = 10),
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank(),
-        plot.margin = unit(c(rep(0.4,4)), units = , "cm")
-  )
+        plot.margin = unit(c(rep(0.4,4)), units = "cm")
+  ))
 
+ggsave("Figures/Figure_5.jpg", width = 8, height = 5)
 
-library("glmmTMB")
-
-table(db.trait2$Class)
 formula_m1 <- as.formula("Delta_Value ~ Ecological_Classification + Class + Methodology + (1 | Paper_ID)")
-model <- glmmTMB::glmmTMB(formula_m1, data = db.trait2,family = Gamma(link ="log"),
-                          control=glmmTMBControl(optimizer=optim,
+model <- glmmTMB::glmmTMB(formula_m1, data = db.trait2, family = gaussian,#Gamma(link ="log"),
+                          control = glmmTMBControl(optimizer=optim,
                                                  optArgs=list(method="BFGS")))
 
-summary(model)
-
-levels(db.trait2$Class)
-
 performance::check_model(model)
-
-
-ggpubr::ggarrange(ploot_1, ploot_1, 
-                  hjust = -0.2,
-                  ncol = 1, nrow = 2, labels = c("A", "B"))
 
 # Saving tables -----------------------------------------------------------
 result_for_plot
