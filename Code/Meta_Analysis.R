@@ -30,7 +30,7 @@ library("tidylog")
 
 # Loading pictures ------------------------------------------------------
 
-Badino_2004 <- png::readPNG("Pictures/Badino_2004.png")
+#Badino_2004 <- png::readPNG("Pictures/492x512.png")
 
 # Sourcing useful functions ------------------------------------------------
 
@@ -209,10 +209,10 @@ rm(world) #cleaning
                                       to=max(db.pub$Year_publication),by=4))+ 
     scale_y_continuous(breaks = seq(from=0,to=10,by=1))+
    
-   # annotation_custom(grid::rasterGrob(Badino_2004),
-   #                   xmin = unit(1990, "native"), xmax = unit(2010,"native"),
-   #                   ymin = unit(3,"npc"),  ymax = unit(5,"npc"))+
-   # 
+    # annotation_custom(grid::rasterGrob(Badino_2004),
+    #                  xmin = unit(1990, "native"), xmax = unit(2010,"native"),
+    #                  ymin = unit(3,"npc"),  ymax = unit(5,"npc"))+
+
     labs(x = NULL,
          y = "Number of studies")+
     theme_classic())
@@ -417,7 +417,7 @@ for (i in 1 : nlevels(db.metafor$Response)){
   
 } ; rm(i, data_i, failsafe_rosenthal) #cleaning
 dev.off()
-?funnel
+
 # Plotting ----------------------------------------------------------------
 
 #Arrange
@@ -608,7 +608,6 @@ result_for_plot3$label <-
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
     ))
 
-
 # Saving the plots --------------------------------------------------------
 
 pdf(file = "Figures/Figure_1.pdf", width = 10, height = 5)
@@ -627,70 +626,80 @@ dev.off()
 
 ###############################################################
 
-## Trait-Analysis
+## Physiological-based estimates
 
 ###############################################################
 
 db.trait2 <- db.trait[db.trait$Response_revised == "LT50", ]
-colnames(db.trait2)
 db.trait2 <- droplevels(db.trait2)
+
+db.trait2$Ramping <- ifelse(db.trait2$Ramping..min. > 1, "Hours/Days", "Minutes")
+db.trait2$Ramping <- as.factor(db.trait2$Ramping)
+
 levels(db.trait2$Class)[c(2, 4)] <- "Crustacea"
-levels(db.trait2$Ecological_Classification_revised) <-
-  c(rep("High", 2), "Low")
 
-db.trait2$Class <-
-  factor(db.trait2$Class, levels = c("Crustacea", "Arachnida", "Insecta")) #Sort
+#db.trait2$Class <- factor(db.trait2$Class, levels = c("Crustacea", "Arachnida", "Insecta")) #Sort
+levels(db.trait2$Ecological_Classification) <- c("Low/Null","High","Low/Null")
 
-db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class,
-                                  fill = Ecological_Classification_revised)) +
-  #facet_wrap(~Class, nrow = 1,ncol =3)+
+db.trait2 <- droplevels(db.trait2)
+
+db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, fill = Ecological_Classification)) +
+  #facet_wrap(~ Class, nrow = 1, ncol = 3,scales = "free")+
   geom_boxplot(col = "grey10",
                outlier.shape = NA,
                alpha = 0.4) +
-  geom_jitter(position = position_jitterdodge(),
-              shape = 21,
-              alpha = 0.6) +
+  geom_point(aes(size = N), shape = 21,
+             position = position_jitterdodge(), color = "grey10",alpha = 0.3) +
+  # geom_jitter(aes(size = N, shape = Methodology), position = position_jitterdodge(),
+  #             alpha = 0.4) +
   geom_vline(xintercept = 1.5, linetype = "dotted") +
   geom_vline(xintercept = 2.5, linetype = "dotted") +
   labs(
     x = NULL,
-    y = "LT50",
+    y = expression(Delta * "LT50 (Lethal temperature - habitat temperature) [°C]"),
     title = NULL,
     subtitle = NULL
   ) +
-  guides(fill = guide_legend(title.position = "top")) +
-  scale_fill_manual("Subterranean specialization", values = c("grey20", "orange")) +
-  theme_custom() +
-  theme(legend.position = "top")
-  
-theme_custom <- function(){
+  guides(fill = guide_legend(title.position = "top"),
+         size = guide_legend(title.position = "top"),
+         shape = guide_legend(title.position = "top")) +
+  scale_size_continuous("Sample size") +
+  scale_fill_manual("Subterranean specialization", values = c("white", "grey10")) +
+  scale_shape_manual("Experiment type", 
+                     values = c(21,24))+
   theme_bw() +
-    theme(
-      axis.text = element_text(size = 12), 
-      axis.title = element_text(size = 14),
-      axis.line.x = element_line(color="black"), 
-      axis.line.y = element_line(color="black"),
-      panel.border = element_blank(),
-      panel.grid.major.x = element_blank(),                                          
-      panel.grid.minor.x = element_blank(),
-      panel.grid.minor.y = element_blank(),
-      panel.grid.major.y = element_blank(),  
-      plot.margin = unit(c(1, 1, 1, 1), units = , "cm"),
-      plot.title = element_text(size = 15, vjust = 1, hjust = 0),
-      legend.text = element_text(size = 12),          
-      legend.title = element_text(size = 12),                              
-      legend.position = c(0.95, 0.15), 
-      legend.key = element_blank(),
-      legend.background = element_rect(color = "black", 
-                                       fill = "transparent", 
-                                       size = 2, linetype = "blank"))}
+  theme(legend.position = "top", 
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 8),
+        axis.title = element_text(size = 12),
+        axis.line.x = element_line(color="grey10"), 
+        axis.line.y = element_line(color="grey10"),
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        plot.margin = unit(c(rep(0.4,4)), units = , "cm")
+  )
+
+
+library("glmmTMB")
+
+table(db.trait2$Class)
+formula_m1 <- as.formula("Delta_Value ~ Ecological_Classification + Class + Methodology + (1 | Paper_ID)")
+model <- glmmTMB::glmmTMB(formula_m1, data = db.trait2,family = Gamma(link ="log"),
+                          control=glmmTMBControl(optimizer=optim,
+                                                 optArgs=list(method="BFGS")))
+
+summary(model)
+
+levels(db.trait2$Class)
+
+performance::check_model(model)
 
 
 ggpubr::ggarrange(ploot_1, ploot_1, 
                   hjust = -0.2,
                   ncol = 1, nrow = 2, labels = c("A", "B"))
-
-
 
 # Saving tables -----------------------------------------------------------
 result_for_plot
