@@ -219,7 +219,7 @@ rm(world) #cleaning
     #             method.args = list(family = "poisson"))+
     scale_x_continuous(breaks = seq(from=min(db.pub$Year_publication),
                                       to=max(db.pub$Year_publication),by=4))+ 
-    scale_y_continuous(breaks = seq(from=0,to=10,by=1))+
+    scale_y_continuous(breaks = seq(from=0,to=13,by=1))+
    
     labs(x = NULL,
          y = "Number of studies")+
@@ -632,7 +632,7 @@ dev.off()
 
 ###############################################################
 
-## Physiological-based estimates
+## Trait analysis
 
 ###############################################################
 
@@ -674,7 +674,7 @@ db.trait2 <- droplevels(db.trait2)
          size = guide_legend(title.position = "top"),
          shape = guide_legend(title.position = "top")) +
   scale_size_continuous("Sample size") +
-  scale_fill_manual("Subterranean specialization", values = c("white", "blue")) +
+  scale_fill_manual("Subterranean specialization", values = c("white", "deeppink4")) +
   scale_shape_manual("Experiment type", 
                      values = c(21,24))+
   
@@ -704,14 +704,13 @@ db.trait2 <- droplevels(db.trait2)
         plot.margin = unit(c(rep(0.4,4)), units = "cm")
   ))
 
-#ggsave("Figures/Figure_5.jpg", width = 8, height = 5)
-
 formula_m1 <- as.formula("Delta_Value ~ Ecological_Classification + Class + Methodology + (1 | Paper_ID)")
 model <- glmmTMB::glmmTMB(formula_m1, data = db.trait2, family = gaussian,#Gamma(link ="log"),
                           control = glmmTMBControl(optimizer=optim,
                                                  optArgs=list(method="BFGS")))
 
 performance::check_model(model)
+summary(model)
 
 # LT 100
 db.trait3 <- db.trait[db.trait$Response_revised == "LT100", ]
@@ -733,8 +732,6 @@ db.trait3$Ecological_Classification <- factor(db.trait3$Ecological_Classificatio
                    size = N, 
                    shape = Methodology),
                position = position_dodge2(0.65, preserve = "single"), color = "grey10",alpha = 0.3)+#shape = 21,
-    # position = position_jitterdodge(jitter.width = 0.2, 
-    #                                 dodge.width = 0.9)
     geom_vline(xintercept = 1.5, linetype = "dotted") +
     geom_vline(xintercept = 2.5, linetype = "dotted") +
     labs(
@@ -743,26 +740,10 @@ db.trait3$Ecological_Classification <- factor(db.trait3$Ecological_Classificatio
       title = NULL,
       subtitle = NULL
     ) +
-    # guides(fill = guide_legend(title.position = "top"),
-    #        size = guide_legend(title.position = "top"),
-    #        shape = guide_legend(title.position = "top")) +
     scale_size_continuous("Sample size") +
-    scale_fill_manual("Subterranean specialization", values = c("white", "blue")) +
+    scale_fill_manual("Subterranean specialization", values = c("white", "deeppink4")) +
     scale_shape_manual("Experiment type", 
                        values = c(21,24))+
-    
-    # annotation_custom(grid::rasterGrob(spider_png),
-    #                   xmin = unit(0.9, "native"), xmax = unit(1.4,"native"),
-    #                   ymin = unit(34,"npc"),  ymax = unit(43.5,"npc"))+
-    # 
-    # annotation_custom(grid::rasterGrob(crustacean_png),
-    #                   xmin = unit(1.9, "native"), xmax = unit(2.4,"native"),
-    #                   ymin = unit(36,"npc"),  ymax = unit(43.5,"npc"))+
-    # 
-    # annotation_custom(grid::rasterGrob(insect_png),
-    #                   xmin = unit(3.1, "native"), xmax = unit(3.5,"native"),
-    #                   ymin = unit(36,"npc"),  ymax = unit(43.5,"npc"))+
-    # ylim(0, 42)+
     theme_bw(base_family = "Arial") +
     theme(legend.position = "none", 
           legend.direction = "horizontal",
@@ -783,7 +764,6 @@ ggpubr::ggarrange(box_3, box_4, hjust = -0.1, heights = c(1,0.9),
 ggsave("Figures/Figure_5.jpg", width = 8, height = 8)
 
 # Saving tables -----------------------------------------------------------
-result_for_plot
 
 rownames(result_for_plot) <- NULL
 result_for_plot <- result_for_plot[,-c(2:3)]
@@ -848,3 +828,4 @@ result_for_plot3 <- result_for_plot3 %>%
                 p)
 
 xlsx::write.xlsx(result_for_plot3, "Tables/Table_S3.xlsx")
+#end
