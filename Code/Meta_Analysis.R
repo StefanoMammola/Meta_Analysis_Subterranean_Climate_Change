@@ -19,7 +19,8 @@ rm(list = ls())
 # Loading R package -------------------------------------------------------
 
 library("dplyr")
-library("metafor")   
+library("metafor")
+library("grid")
 library("ggplot2")
 library("ggpubr")
 library("ggthemes")
@@ -83,6 +84,13 @@ str(db.meta)
 # Database with only one estimate / paper
 db.meta.distinct <- db.meta %>% 
                     dplyr::distinct(Paper_ID, .keep_all = TRUE) 
+
+# How many authors we contacted -------------------------------------------
+
+db.pub$Corresponding_emailed %>% table()
+
+db.pub[db.pub$Corresponding_emailed == "yes",]$Answer %>% table() #response rate
+
 
 # Extracting temporal range of each study ---------------------------------
 
@@ -628,6 +636,7 @@ dev.off()
 
 ###############################################################
 
+# LT 50
 db.trait2 <- db.trait[db.trait$Response_revised == "LT50", ]
 db.trait2 <- droplevels(db.trait2)
 
@@ -641,7 +650,7 @@ levels(db.trait2$Ecological_Classification) <- c("Low/Null","High","Low/Null")
 
 db.trait2 <- droplevels(db.trait2)
 
-(box_4 <- db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, 
+(box_3 <- db.trait2 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, 
                                   fill = Ecological_Classification)) +
   geom_boxplot(col = "grey10",
                outlier.shape = NA,
@@ -657,7 +666,7 @@ db.trait2 <- droplevels(db.trait2)
   geom_vline(xintercept = 2.5, linetype = "dotted") +
   labs(
     x = NULL,
-    y = expression(Delta * "LT50 (Lethal temperature - habitat temperature) [°C]"),
+    y = expression(Delta * "LT50 [°C]"),
     title = NULL,
     subtitle = NULL
   ) +
@@ -688,14 +697,14 @@ db.trait2 <- droplevels(db.trait2)
         axis.title = element_text(size = 12),
         axis.line.x = element_line(color="grey10"), 
         axis.line.y = element_line(color="grey10"),
-        axis.text.x = element_text(size = 10), 
+        axis.text.x = element_blank(), 
         axis.text.y = element_text(size = 10),
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank(),
         plot.margin = unit(c(rep(0.4,4)), units = "cm")
   ))
 
-ggsave("Figures/Figure_5.jpg", width = 8, height = 5)
+#ggsave("Figures/Figure_5.jpg", width = 8, height = 5)
 
 formula_m1 <- as.formula("Delta_Value ~ Ecological_Classification + Class + Methodology + (1 | Paper_ID)")
 model <- glmmTMB::glmmTMB(formula_m1, data = db.trait2, family = gaussian,#Gamma(link ="log"),
@@ -703,6 +712,75 @@ model <- glmmTMB::glmmTMB(formula_m1, data = db.trait2, family = gaussian,#Gamma
                                                  optArgs=list(method="BFGS")))
 
 performance::check_model(model)
+
+# LT 100
+db.trait3 <- db.trait[db.trait$Response_revised == "LT100", ]
+db.trait3 <- droplevels(db.trait3)
+
+levels(db.trait3$Class)[3] <- "Crustacea"
+db.trait3$Class <- factor(db.trait3$Class, levels = c("Arachnida", "Crustacea" ,"Insecta")) #Sort
+
+levels(db.trait3$Ecological_Classification) <- c("High","Low")
+db.trait3$Ecological_Classification <- factor(db.trait3$Ecological_Classification, levels = c("Low", "High" ,"Insecta")) #Sort
+
+(box_4 <- db.trait3 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, 
+                                            fill = Ecological_Classification)) +
+    geom_boxplot(col = "grey10",
+                 outlier.shape = NA,
+                 alpha = 0.4,
+                 position = position_dodge2(0.65, preserve = "single")) +
+    geom_point(aes(fill = Ecological_Classification, 
+                   size = N, 
+                   shape = Methodology),
+               position = position_dodge2(0.65, preserve = "single"), color = "grey10",alpha = 0.3)+#shape = 21,
+    # position = position_jitterdodge(jitter.width = 0.2, 
+    #                                 dodge.width = 0.9)
+    geom_vline(xintercept = 1.5, linetype = "dotted") +
+    geom_vline(xintercept = 2.5, linetype = "dotted") +
+    labs(
+      x = NULL,
+      y = expression(Delta * "LT100 [°C]"),
+      title = NULL,
+      subtitle = NULL
+    ) +
+    # guides(fill = guide_legend(title.position = "top"),
+    #        size = guide_legend(title.position = "top"),
+    #        shape = guide_legend(title.position = "top")) +
+    scale_size_continuous("Sample size") +
+    scale_fill_manual("Subterranean specialization", values = c("white", "blue")) +
+    scale_shape_manual("Experiment type", 
+                       values = c(21,24))+
+    
+    # annotation_custom(grid::rasterGrob(spider_png),
+    #                   xmin = unit(0.9, "native"), xmax = unit(1.4,"native"),
+    #                   ymin = unit(34,"npc"),  ymax = unit(43.5,"npc"))+
+    # 
+    # annotation_custom(grid::rasterGrob(crustacean_png),
+    #                   xmin = unit(1.9, "native"), xmax = unit(2.4,"native"),
+    #                   ymin = unit(36,"npc"),  ymax = unit(43.5,"npc"))+
+    # 
+    # annotation_custom(grid::rasterGrob(insect_png),
+    #                   xmin = unit(3.1, "native"), xmax = unit(3.5,"native"),
+    #                   ymin = unit(36,"npc"),  ymax = unit(43.5,"npc"))+
+    # ylim(0, 42)+
+    theme_bw(base_family = "Arial") +
+    theme(legend.position = "none", 
+          legend.direction = "horizontal",
+          legend.text = element_text(size = 8),
+          axis.title = element_text(size = 12),
+          axis.line.x = element_line(color="grey10"), 
+          axis.line.y = element_line(color="grey10"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          plot.margin = unit(c(rep(0.4,4)), units = "cm")
+    ))
+
+ggpubr::ggarrange(box_3, box_4, hjust = -0.1, heights = c(1,0.9),
+                  ncol = 1, nrow = 2, labels = c("A", "B"))
+
+ggsave("Figures/Figure_5.jpg", width = 8, height = 8)
 
 # Saving tables -----------------------------------------------------------
 result_for_plot
