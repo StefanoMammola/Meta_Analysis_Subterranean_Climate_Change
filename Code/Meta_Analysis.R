@@ -499,12 +499,14 @@ p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
          y = NULL) +
   xlim(-1,1)+
   scale_color_manual("Response type", 
-                     values = colors.type)+
+                     values = colors.type[c(2,4,3,1)],
+                     breaks = c("Habitat", "Population/Community", "Physiology", "Behaviour"))+
   scale_fill_manual("Response type", 
-                    values = colors.type)+
+                    values = colors.type[c(2,4,3,1)],
+                    breaks = c("Habitat", "Population/Community", "Physiology", "Behaviour"))+
   scale_size("Temporal scale (Years)",
              breaks = c(1,10,50,100))+
-  scale_shape_manual("Domain", 
+  scale_shape_manual("Habitat", 
                      values = c(21,24))+
   
   theme_bw() + 
@@ -569,7 +571,6 @@ result_for_plot2$label <-
           plot.margin = unit(c(rep(0.4,4)), units = , "cm")
     ))
 
-
 result_for_plot3$Type <- 
   factor(result_for_plot3$Type, levels = c("Behaviour","Physiology","Population/Community","Habitat")) #Sort
 
@@ -594,10 +595,10 @@ result_for_plot3$label <-
     
     xlim(-1,1)+
     
-    scale_fill_manual("Domain",
+    scale_fill_manual("Habitat",
                       values = c("steelblue1","grey30"))+
     
-    scale_shape_manual("Domain", values = c(21,24))+
+    scale_shape_manual("Habitat", values = c(21,24))+
     
     theme_bw() + 
     theme(legend.position = "right", 
