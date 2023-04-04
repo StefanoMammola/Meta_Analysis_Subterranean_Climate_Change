@@ -69,6 +69,10 @@ db.meta <-
     as.is = FALSE
   )
 
+#removing life history traits (only 2 estimates)
+
+db.meta <- db.meta[db.meta$Response_macrogroup != "Life history",]
+
 # Database with traits
 db.trait <-
   read.csv(
@@ -85,12 +89,8 @@ str(db.meta)
 db.meta.distinct <- db.meta %>% 
                     dplyr::distinct(Paper_ID, .keep_all = TRUE) 
 
-# How many authors we contacted -------------------------------------------
-
-db.pub$Corresponding_emailed %>% table()
-
-db.pub[db.pub$Corresponding_emailed == "yes",]$Answer %>% table() #response rate
-
+db.pub.distinct <- db.pub %>% 
+  dplyr::distinct(Paper_ID, .keep_all = TRUE) 
 
 # Extracting temporal range of each study ---------------------------------
 
@@ -143,8 +143,9 @@ db.meta$P.value <- as.numeric(db.meta$P.value)
 
 # Summary stats -----------------------------------------------------------
 
-# How many papers?
-db.pub %>% dplyr::distinct(Paper_ID, .keep_all = TRUE) %>% nrow()
+# How many papers and sources?
+db.pub.distinct %>% nrow()
+db.pub.distinct$Source %>% table()
 
 # How many papers for meta-analysis?
 db.meta.distinct %>% nrow()
@@ -159,6 +160,14 @@ mean(table(db.meta$Paper_ID)) ; SE(table(db.meta$Paper_ID))
 db.meta.distinct %>% dplyr::select(Domain) %>% table()
 db.meta.distinct %>% dplyr::select(System_specific) %>% table()
 db.meta %>% dplyr::select(Ecology_group) %>% table()
+
+# geography
+
+db.pub.distinct$Geography %>% table()
+
+db.meta$Response_macrogroup %>% table
+
+db.meta$Response_macrogroup %>% table / sum(db.meta$Response_macrogroup %>% table)
 
 ###############################################################
 ## Figures:
@@ -720,8 +729,8 @@ db.trait3 <- droplevels(db.trait3)
 levels(db.trait3$Class)[3] <- "Crustacea"
 db.trait3$Class <- factor(db.trait3$Class, levels = c("Arachnida", "Crustacea" ,"Insecta")) #Sort
 
-levels(db.trait3$Ecological_Classification) <- c("High","Low")
-db.trait3$Ecological_Classification <- factor(db.trait3$Ecological_Classification, levels = c("Low", "High" ,"Insecta")) #Sort
+levels(db.trait3$Ecological_Classification) <- c("Low/Null","High","Low/Null")
+db.trait3$Ecological_Classification <- factor(db.trait3$Ecological_Classification, levels = c("Low/Null", "High")) #Sort
 
 (box_4 <- db.trait3 %>% ggplot2::ggplot(aes(y = Delta_Value, x = Class, 
                                             fill = Ecological_Classification)) +
