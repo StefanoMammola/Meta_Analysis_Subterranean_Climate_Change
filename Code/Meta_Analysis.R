@@ -458,8 +458,8 @@ color.num <- table(result_for_plot$Type)
 
 color.axis.y <- c(rep(colors.type[2], color.num[4]),
                   rep(colors.type[4], color.num[3]),
-                  rep(colors.type[3], color.num[2]), #
-                  rep(colors.type[1], color.num[1])) #
+                  rep(colors.type[3], color.num[2]), 
+                  rep(colors.type[1], color.num[1])) 
 
 face.axis.y   <- ifelse(result_for_plot$p > 0.05, "plain", "bold")
 p.values.meta <- ifelse(result_for_plot$p > 0.05, " ", " *")
@@ -629,7 +629,7 @@ result_for_plot3$label <-
 # Saving the plots --------------------------------------------------------
 
 pdf(file = "Figures/Figure_2.pdf", width = 10, height = 5)
-plot.year + annotation_custom(ggplotGrob(plot.map),xmin=1983,xmax=2013,ymin=3,ymax=10)
+plot.year + annotation_custom(ggplotGrob(plot.map),xmin = 1983, xmax = 2013,ymin = 3, ymax = 10)
 dev.off()
 
 pdf(file = "Figures/Figure_3.pdf", width = 14, height = 6)
@@ -707,8 +707,8 @@ db.trait2 <- droplevels(db.trait2)
         legend.direction = "horizontal",
         legend.text = element_text(size = 8),
         axis.title = element_text(size = 12),
-        axis.line.x = element_line(color="grey10"), 
-        axis.line.y = element_line(color="grey10"),
+        axis.line.x = element_line(color = "grey10"), 
+        axis.line.y = element_line(color = "grey10"),
         axis.text.x = element_blank(), 
         axis.text.y = element_text(size = 10),
         panel.grid.major.x = element_blank(),
