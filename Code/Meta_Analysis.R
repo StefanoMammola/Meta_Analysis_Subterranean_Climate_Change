@@ -321,6 +321,8 @@ for (i in 1 : nlevels(db.metafor$Response)){
                      data = na.omit(data_i),
                      control = list(rel.tol=1e-8))
 
+  ?rma.mv
+  
   # Adding missing level in the database
   data_i_eco  <- data_i[data_i$Paper_ID %in% model2_i$mf.r[[1]]$Paper_ID,]
   data_i_eco  <- droplevels(data_i_eco)
