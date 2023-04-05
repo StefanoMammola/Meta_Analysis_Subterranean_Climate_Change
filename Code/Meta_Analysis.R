@@ -1,7 +1,7 @@
 ###############################################################
 
 ## A global meta-analysis on the biological impacts of climate change in subterranean ecosystems
-# Ilaria Vaccarelli, Raquel Colado, David Sanchez-Fernandez, Diana M. P. Galassi, Susana Pallarés, Mattia Di Cicco, Melissa B. Meierhofer, Elena Piano, Stefano Mammola
+# Ilaria Vaccarelli, Raquel Colado, David Sanchez-Fernandez, Diana M. P. Galassi, Susana Pallarés, Mattia Di Cicco, Melissa B. Meierhofer, Elena Piano, Tiziana Di Lorenzo, Stefano Mammola
 
 ## ------------------------------------------------------------------------
 # 'R script to reproduce the analyses'
