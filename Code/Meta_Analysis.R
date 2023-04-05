@@ -684,7 +684,7 @@ db.trait2 <- droplevels(db.trait2)
          size = guide_legend(title.position = "top"),
          shape = guide_legend(title.position = "top")) +
   scale_size_continuous("Sample size") +
-  scale_fill_manual("Subterranean specialization", values = c("white", "deeppink4")) +
+  scale_fill_manual("Subterranean specialisation", values = c("white", "deeppink4")) +
   scale_shape_manual("Experiment type", 
                      values = c(21,24))+
   
@@ -751,7 +751,7 @@ db.trait3$Ecological_Classification <- factor(db.trait3$Ecological_Classificatio
       subtitle = NULL
     ) +
     scale_size_continuous("Sample size") +
-    scale_fill_manual("Subterranean specialization", values = c("white", "deeppink4")) +
+    scale_fill_manual("Subterranean specialisation", values = c("white", "deeppink4")) +
     scale_shape_manual("Experiment type", 
                        values = c(21,24))+
     theme_bw(base_family = "Arial") +
