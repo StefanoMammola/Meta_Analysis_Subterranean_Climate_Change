@@ -39,7 +39,7 @@ crustacean_png  <- png::readPNG("Pictures/Niphargus.png")
 
 # Sourcing useful functions ------------------------------------------------
 
-source("Functions/Custom_functions.r")
+source("Functions/Custom_functions.r") #Useful custom functions and ggplot2 settings
 
 ###############################################################
 ## Data preparation:
@@ -98,7 +98,7 @@ db.pub.distinct <- db.pub %>%
 
 levels(db.meta$Year)
 
-#Extracting range with a loop
+#Extracting Temporal span (years) of each study with a loop
 Yr_min   <- c()
 Yr_max   <- c()
 Yr_range <- c()
@@ -132,7 +132,7 @@ range(Yr_range, na.rm = TRUE)
 
 db.meta <- data.frame(db.meta, Yr_min, Yr_max, Yr_range) ; head(db.meta)
 
-rm(i, Year, Yr_min, Yr_max, Yr_range, Data_i)
+rm(i, Year, Yr_min, Yr_max, Yr_range, Data_i) #clean
 
 # Cleaning p value --------------------------------------------------------
 
@@ -453,7 +453,7 @@ db.metafor$Response <-
   factor(db.metafor$Response, 
          levels = result_for_plot$label) #Sort
 
-colors.type <- c("darkorange","grey10","blue","darkmagenta")
+colors.type <- c("chocolate3","grey10","blue","darkmagenta")
 color.num <- table(result_for_plot$Type)
 
 color.axis.y <- c(rep(colors.type[2], color.num[4]),
